@@ -14,6 +14,8 @@ import com.mall.product.dto.ProductView;
 import com.mall.product.entity.Product;
 import com.mall.product.entity.ProductStatus;
 import com.mall.product.mapper.ProductMapper;
+import com.mall.product.mq.ProductChangedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -28,9 +30,11 @@ import java.util.List;
 public class ProductService {
 
     private final ProductMapper productMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public ProductService(ProductMapper productMapper) {
+    public ProductService(ProductMapper productMapper, ApplicationEventPublisher eventPublisher) {
         this.productMapper = productMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -49,6 +53,7 @@ public class ProductService {
         product.setImageUrl(request.imageUrl());
         product.setStatus(ProductStatus.OFF_SALE.getCode());
         productMapper.insert(product);
+        publishChanged(product.getId());
         return ProductView.from(product);
     }
 
@@ -81,6 +86,7 @@ public class ProductService {
         }
         product.setUpdateTime(LocalDateTime.now());
         productMapper.updateById(product);
+        publishChanged(product.getId());
         return ProductView.from(product);
     }
 
@@ -95,6 +101,7 @@ public class ProductService {
         product.setStatus(target.getCode());
         product.setUpdateTime(LocalDateTime.now());
         productMapper.updateById(product);
+        publishChanged(product.getId());
         return ProductView.from(product);
     }
 
@@ -124,6 +131,22 @@ public class ProductService {
             throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND);
         }
         return ProductView.from(product);
+    }
+
+    /**
+     * 按 ID 查询，不限状态，供索引同步使用
+     */
+    @Transactional(readOnly = true)
+    public ProductView getById(Long id) {
+        Product product = productMapper.selectById(id);
+        if (product == null) {
+            throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND);
+        }
+        return ProductView.from(product);
+    }
+
+    private void publishChanged(Long productId) {
+        eventPublisher.publishEvent(new ProductChangedEvent(productId));
     }
 
     private PageResult<ProductView> queryPage(ProductQuery query, Integer status) {
