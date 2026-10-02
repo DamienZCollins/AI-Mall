@@ -41,3 +41,13 @@ desktop.ini
 # 临时文件
 *.tmp
 *.bak
+
+# 本地验证脚本（保留在本地，不进入版本库）
+/scripts/
+!/scripts/api_check.py
+!/scripts/search_check.py
+!/scripts/sync_check.py
+!/scripts/seckill_check.py
+
+# 并发验证用测试数据
+/sql/data-seckill-test.sql

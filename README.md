@@ -37,14 +37,30 @@ mvn spring-boot:run
 | GET | `/api/products` | 公开 | 分页查询上架商品 |
 | GET | `/api/products/{id}` | 公开 | 上架商品详情 |
 | GET | `/api/search` | 公开 | 关键词 + 语义混合搜索 |
+| GET | `/api/seckill/activities` | 公开 | 分页查询秒杀活动 |
+| GET | `/api/seckill/activities/{id}` | 公开 | 秒杀活动详情 |
+| POST | `/api/seckill/{activityId}` | 登录 | 抢购下单 |
+| GET | `/api/seckill/orders/{orderNo}` | 登录 | 查询秒杀订单 |
+| POST | `/api/seckill/orders/{orderNo}/pay` | 登录 | 模拟支付回调 |
 | POST | `/api/admin/products` | ADMIN | 新增商品 |
 | PUT | `/api/admin/products/{id}` | ADMIN | 编辑商品 |
 | PATCH | `/api/admin/products/{id}/status` | ADMIN | 上架 / 下架 |
 | GET | `/api/admin/products` | ADMIN | 分页查询商品（含下架） |
 | POST | `/api/admin/products/images` | ADMIN | 上传商品图片 |
 | POST | `/api/admin/search/reindex` | ADMIN | 全量重建商品索引 |
+| POST | `/api/admin/seckill/activities` | ADMIN | 创建秒杀活动 |
+| PUT | `/api/admin/seckill/activities/{id}` | ADMIN | 编辑秒杀活动 |
+| GET | `/api/admin/seckill/activities` | ADMIN | 分页查询全部秒杀活动 |
 
 带权限的接口需携带 `Authorization: Bearer <token>`。接口文档：`/swagger-ui/index.html`。
+
+## 秒杀
+
+活动与库存分表，防超卖靠数据库条件更新 `UPDATE seckill_stock SET stock = stock - 1
+WHERE activity_id = ? AND stock > 0`，影响行数为 0 即售罄；防重复下单靠 `seckill_order`
+上的唯一索引 `(user_id, activity_id)`，不依赖先查后插。待支付订单由定时任务扫描超时后
+取消并回补库存，回补通过条件更新的影响行数保证不会重复执行。
+
 
 ## 混合搜索
 
@@ -73,12 +89,26 @@ Elasticsearch 使用自建镜像 `docker/elasticsearch/Dockerfile`，额外安�
 ```text
 .
 ├── config/                     # 配置模板
-├── docker/rocketmq/            # RocketMQ broker 配置
+├── docker/                     # RocketMQ broker 配置、含 ik 分词的 ES 镜像
 ├── docker-compose.yml          # 本地中间件编排
-├── scripts/                    # 辅助脚本
+├── scripts/                    # 本机验证脚本，不进入版本库
 ├── sql/                        # 建表与初始化数据脚本
 └── .env.example                # 环境变量模板
 ```
+
+## 验证脚本
+
+`scripts/` 下的脚本用于本机验收，各阶段的实测结果记录在 `docs/拆分任务/` 下。
+脚本不进入版本库，需要时本地保留即可：
+
+| 脚本 | 说明 |
+| --- | --- |
+| `api_check.py` | 认证、权限、商品维护、图片上传 |
+| `search_check.py` | 对比 RRF 融合、BM25、kNN 三路检索结果 |
+| `sync_check.py` | 商品变更到 Elasticsearch 索引的同步链路 |
+| `seckill_check.py` | 秒杀防超卖、防重复下单、状态机、超时回补（含并发） |
+
+`seckill_check.py` 需要并发账号，先执行 `sql/data-seckill-test.sql` 写入测试用户。
 
 ## 文档
 
