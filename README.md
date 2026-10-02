@@ -88,7 +88,6 @@ Elasticsearch 使用自建镜像 `docker/elasticsearch/Dockerfile`，额外安�
 
 ```text
 .
-├── config/                     # 配置模板
 ├── docker/                     # RocketMQ broker 配置、含 ik 分词的 ES 镜像
 ├── docker-compose.yml          # 本地中间件编排
 ├── scripts/                    # 本机验证脚本，不进入版本库
