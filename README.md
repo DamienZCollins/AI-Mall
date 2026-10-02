@@ -14,9 +14,35 @@ copy .env.example .env
 # 2. 启动本地中间件
 docker compose up -d
 
-# 3. 查看状态
+# 3. 建表与初始化数据
+docker exec -i mall-mysql mysql -uroot -p1234 --default-character-set=utf8mb4 mall < sql/schema.sql
+docker exec -i mall-mysql mysql -uroot -p1234 --default-character-set=utf8mb4 mall < sql/data.sql
+
+# 4. 查看状态
 docker compose ps
+
+# 5. 启动应用（凭据从 .env 读取）
+set -a && . ./.env && set +a
+mvn spring-boot:run
 ```
+
+初始账号：`admin / admin123`（管理员）、`user / user123`（普通用户）。
+
+## 接口一览
+
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| POST | `/api/auth/login` | 公开 | 登录并获取 JWT |
+| GET | `/api/auth/me` | 登录 | 当前登录用户 |
+| GET | `/api/products` | 公开 | 分页查询上架商品 |
+| GET | `/api/products/{id}` | 公开 | 上架商品详情 |
+| POST | `/api/admin/products` | ADMIN | 新增商品 |
+| PUT | `/api/admin/products/{id}` | ADMIN | 编辑商品 |
+| PATCH | `/api/admin/products/{id}/status` | ADMIN | 上架 / 下架 |
+| GET | `/api/admin/products` | ADMIN | 分页查询商品（含下架） |
+| POST | `/api/admin/products/images` | ADMIN | 上传商品图片 |
+
+带权限的接口需携带 `Authorization: Bearer <token>`。接口文档：`/swagger-ui/index.html`。
 
 ## 开发环境
 
@@ -37,6 +63,8 @@ docker compose ps
 ├── config/                     # 配置模板
 ├── docker/rocketmq/            # RocketMQ broker 配置
 ├── docker-compose.yml          # 本地中间件编排
+├── scripts/                    # 辅助脚本
+├── sql/                        # 建表与初始化数据脚本
 └── .env.example                # 环境变量模板
 ```
 
