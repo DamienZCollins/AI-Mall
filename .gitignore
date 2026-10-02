@@ -43,11 +43,10 @@ desktop.ini
 *.bak
 
 # 本地验证脚本（保留在本地，不进入版本库）
-/scripts/
+# 目录级忽略会屏蔽后面的取反规则，必须先放开目录内容再排除
+/scripts/*
 !/scripts/api_check.py
-!/scripts/search_check.py
-!/scripts/sync_check.py
-!/scripts/seckill_check.py
+!/scripts/init-rocketmq-topics.sh
 
 # 并发验证用测试数据
 /sql/data-seckill-test.sql
