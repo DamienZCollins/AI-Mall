@@ -17,7 +17,9 @@ public enum ResultCode {
     USER_DISABLED(1003, "账号已被禁用"),
     PRODUCT_NOT_FOUND(2001, "商品不存在"),
     PRODUCT_STATUS_ILLEGAL(2002, "商品状态不合法"),
-    IMAGE_UPLOAD_FAILED(2003, "图片上传失败");
+    IMAGE_UPLOAD_FAILED(2003, "图片上传失败"),
+    EMBEDDING_FAILED(3001, "文本向量化失败"),
+    SEARCH_UNAVAILABLE(3002, "搜索服务暂不可用");
 
     private final int code;
     private final String message;

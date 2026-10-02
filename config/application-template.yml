@@ -15,6 +15,12 @@ spring:
     uris: http://${ELASTICSEARCH_HOST:localhost}:${ELASTICSEARCH_PORT:9200}
 
 mall:
+  jwt:
+    secret: ${JWT_SECRET}
+    expire-minutes: ${JWT_EXPIRE_MINUTES:120}
+  search:
+    index-alias: ${ELASTICSEARCH_INDEX_PRODUCT:mall_product}
+    index-name: ${ELASTICSEARCH_INDEX_PRODUCT:mall_product}_v1
   rocketmq:
     namesrv-addr: ${ROCKETMQ_NAMESRV_HOST:localhost}:${ROCKETMQ_NAMESRV_PORT:9876}
     producer-group: ${ROCKETMQ_PRODUCER_GROUP:mall-producer}
@@ -29,5 +35,5 @@ mall:
   embedding:
     base-url: ${EMBEDDING_BASE_URL}
     api-key: ${EMBEDDING_API_KEY}
-    model: ${EMBEDDING_MODEL:text-embedding-3-small}
-    dimensions: ${EMBEDDING_DIMENSIONS:1536}
+    model: ${EMBEDDING_MODEL:Qwen/Qwen3-Embedding-0.6B}
+    dimensions: ${EMBEDDING_DIMENSIONS:1024}
