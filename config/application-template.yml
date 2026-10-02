@@ -1,0 +1,34 @@
+# Spring Boot 配置模板（阶段 1 起使用）
+# 真实值从环境变量注入，不在此处填写敏感信息
+spring:
+  application:
+    name: mall
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:mall}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+  elasticsearch:
+    uris: http://${ELASTICSEARCH_HOST:localhost}:${ELASTICSEARCH_PORT:9200}
+
+mall:
+  rocketmq:
+    namesrv-addr: ${ROCKETMQ_NAMESRV_HOST:localhost}:${ROCKETMQ_NAMESRV_PORT:9876}
+    producer-group: ${ROCKETMQ_PRODUCER_GROUP:mall-producer}
+    consumer-group: ${ROCKETMQ_CONSUMER_GROUP:mall-consumer}
+  storage:
+    endpoint: ${RUSTFS_ENDPOINT:http://localhost:9000}
+    access-key: ${RUSTFS_ACCESS_KEY}
+    secret-key: ${RUSTFS_SECRET_KEY}
+    region: ${RUSTFS_REGION:us-east-1}
+    bucket: ${RUSTFS_BUCKET_PRODUCT:mall-product}
+    public-base-url: ${RUSTFS_PUBLIC_BASE_URL:http://localhost:9000/mall-product}
+  embedding:
+    base-url: ${EMBEDDING_BASE_URL}
+    api-key: ${EMBEDDING_API_KEY}
+    model: ${EMBEDDING_MODEL:text-embedding-3-small}
+    dimensions: ${EMBEDDING_DIMENSIONS:1536}
