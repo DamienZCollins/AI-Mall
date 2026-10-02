@@ -6,8 +6,10 @@ import com.mall.common.security.AuthContext;
 import com.mall.seckill.dto.SeckillActivityQuery;
 import com.mall.seckill.dto.SeckillActivityView;
 import com.mall.seckill.dto.SeckillOrderView;
+import com.mall.seckill.dto.SeckillResultView;
 import com.mall.seckill.service.SeckillActivityService;
 import com.mall.seckill.service.SeckillOrderService;
+import com.mall.seckill.service.SeckillService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -29,10 +31,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class SeckillController {
 
     private final SeckillActivityService activityService;
+    private final SeckillService seckillService;
     private final SeckillOrderService orderService;
 
-    public SeckillController(SeckillActivityService activityService, SeckillOrderService orderService) {
+    public SeckillController(SeckillActivityService activityService, SeckillService seckillService,
+                             SeckillOrderService orderService) {
         this.activityService = activityService;
+        this.seckillService = seckillService;
         this.orderService = orderService;
     }
 
@@ -49,11 +54,19 @@ public class SeckillController {
         return Result.success(activityService.getById(activityId));
     }
 
-    @Operation(summary = "抢购下单")
+    @Operation(summary = "抢购下单，Redis 预扣成功后立即返回，订单异步创建")
     @PostMapping("/{activityId}")
-    public Result<SeckillOrderView> placeOrder(
+    public Result<Void> placeOrder(
             @PathVariable @Positive(message = "活动 ID 必须为正数") Long activityId) {
-        return Result.success(orderService.placeOrder(activityId, AuthContext.currentUserId()));
+        seckillService.placeOrder(activityId, AuthContext.currentUserId());
+        return Result.success();
+    }
+
+    @Operation(summary = "轮询抢购结果：QUEUING 排队中，SUCCESS 抢到，FAILED 未抢到")
+    @GetMapping("/{activityId}/result")
+    public Result<SeckillResultView> getResult(
+            @PathVariable @Positive(message = "活动 ID 必须为正数") Long activityId) {
+        return Result.success(seckillService.getResult(activityId, AuthContext.currentUserId()));
     }
 
     @Operation(summary = "查询秒杀订单")
