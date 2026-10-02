@@ -19,7 +19,17 @@ public enum ResultCode {
     PRODUCT_STATUS_ILLEGAL(2002, "商品状态不合法"),
     IMAGE_UPLOAD_FAILED(2003, "图片上传失败"),
     EMBEDDING_FAILED(3001, "文本向量化失败"),
-    SEARCH_UNAVAILABLE(3002, "搜索服务暂不可用");
+    SEARCH_UNAVAILABLE(3002, "搜索服务暂不可用"),
+
+    SECKILL_ACTIVITY_NOT_FOUND(4001, "秒杀活动不存在"),
+    SECKILL_NOT_STARTED(4002, "秒杀活动尚未开始"),
+    SECKILL_ENDED(4003, "秒杀活动已结束"),
+    SECKILL_SOLD_OUT(4004, "秒杀商品已售罄"),
+    SECKILL_DUPLICATE_ORDER(4005, "同一活动每人限购一件"),
+    SECKILL_ORDER_NOT_FOUND(4006, "秒杀订单不存在"),
+    SECKILL_ORDER_STATUS_ILLEGAL(4007, "订单状态不允许该操作"),
+    SECKILL_ACTIVITY_TIME_ILLEGAL(4008, "活动时间不合法"),
+    SECKILL_PRICE_ILLEGAL(4009, "秒杀价必须低于商品原价");
 
     private final int code;
     private final String message;
