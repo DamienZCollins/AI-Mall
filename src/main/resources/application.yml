@@ -7,6 +7,19 @@ spring:
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+mall:
+  jwt:
+    secret: ${JWT_SECRET}
+    expire-minutes: ${JWT_EXPIRE_MINUTES:120}
+  storage:
+    endpoint: ${RUSTFS_ENDPOINT:http://localhost:9000}
+    access-key: ${RUSTFS_ACCESS_KEY}
+    secret-key: ${RUSTFS_SECRET_KEY}
+    region: ${RUSTFS_REGION:us-east-1}
+    bucket: ${RUSTFS_BUCKET_PRODUCT:mall-product}
+    public-base-url: ${RUSTFS_PUBLIC_BASE_URL:http://localhost:9000/mall-product}
+    init-bucket: ${RUSTFS_INIT_BUCKET:true}
+
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
