@@ -1,0 +1,14 @@
+# 测试用配置：只提供非空的连接参数，测试不依赖真实中间件
+mall:
+  jwt:
+    secret: test-secret-for-context-load-at-least-32-bytes
+    expire-minutes: 30
+  storage:
+    access-key: test
+    secret-key: test
+    init-bucket: false
+
+spring:
+  datasource:
+    username: test
+    password: test
