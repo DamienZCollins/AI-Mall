@@ -1,0 +1,185 @@
+package com.mall.seckill.service;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.mall.common.exception.BusinessException;
+import com.mall.common.result.ResultCode;
+import com.mall.seckill.entity.SeckillActivity;
+import com.mall.seckill.entity.SeckillStock;
+import com.mall.seckill.mapper.SeckillActivityMapper;
+import com.mall.seckill.mapper.SeckillStockMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+
+/**
+ * 秒杀库存的 Redis 操作：预热、原子预扣、回补
+ *
+ * <p>Redis 是抢购流量的第一道闸门，数据库库存只在消费端扣减，作为最终一致性的落点
+ */
+@Service
+public class SeckillRedisService {
+
+    private static final Logger log = LoggerFactory.getLogger(SeckillRedisService.class);
+
+    private static final String KEY_PREFIX = "mall:seckill:";
+    private static final String DEDUCT_SCRIPT = "lua/seckill_deduct.lua";
+    private static final String RESTORE_SCRIPT = "lua/seckill_restore.lua";
+
+    /** 空集合在 Redis 中不占键，写入一个不会被命中的占位成员让键真实存在 */
+    private static final String SET_PLACEHOLDER = "__init__";
+
+    /** 活动结束后 Key 的保留时长，用于支持活动结束后的结果查询 */
+    private static final Duration KEY_RETENTION_AFTER_END = Duration.ofDays(1);
+
+    private final StringRedisTemplate redisTemplate;
+    private final SeckillActivityMapper activityMapper;
+    private final SeckillStockMapper stockMapper;
+    private final DefaultRedisScript<Long> deductScript;
+    private final DefaultRedisScript<Long> restoreScript;
+
+    public SeckillRedisService(StringRedisTemplate redisTemplate, SeckillActivityMapper activityMapper,
+                               SeckillStockMapper stockMapper) {
+        this.redisTemplate = redisTemplate;
+        this.activityMapper = activityMapper;
+        this.stockMapper = stockMapper;
+        this.deductScript = loadScript(DEDUCT_SCRIPT);
+        this.restoreScript = loadScript(RESTORE_SCRIPT);
+    }
+
+    /**
+     * 把活动库存从数据库加载到 Redis，重复预热会重置库存与买家集合
+     */
+    public void preheat(Long activityId) {
+        SeckillActivity activity = activityMapper.selectById(activityId);
+        if (activity == null) {
+            throw new BusinessException(ResultCode.SECKILL_ACTIVITY_NOT_FOUND);
+        }
+        SeckillStock stock = stockMapper.selectOne(
+                Wrappers.<SeckillStock>lambdaQuery().eq(SeckillStock::getActivityId, activityId));
+        if (stock == null) {
+            throw new BusinessException(ResultCode.SECKILL_ACTIVITY_NOT_FOUND.getCode(), "活动缺少库存记录");
+        }
+
+        Duration ttl = keyTtl(activity);
+        // 先删后写，避免重复预热时残留的买家标记让用户无法下单
+        redisTemplate.delete(allKeys(activityId));
+
+        redisTemplate.opsForValue().set(stockKey(activityId), String.valueOf(stock.getStock()), ttl);
+        redisTemplate.opsForValue().set(startKey(activityId), String.valueOf(toMillis(activity.getStartTime())), ttl);
+        redisTemplate.opsForValue().set(endKey(activityId), String.valueOf(toMillis(activity.getEndTime())), ttl);
+        redisTemplate.opsForValue().set(totalKey(activityId), String.valueOf(activity.getTotalStock()), ttl);
+
+        String buyersKey = buyersKey(activityId);
+        redisTemplate.opsForSet().add(buyersKey, SET_PLACEHOLDER);
+        redisTemplate.expire(buyersKey, ttl);
+
+        log.info("活动 {} 预热完成，库存 {}，总量 {}", activityId, stock.getStock(), activity.getTotalStock());
+    }
+
+    public boolean isPreheated(Long activityId) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(stockKey(activityId)));
+    }
+
+    /**
+     * 原子预扣，库存不足或用户已下单时脚本不做任何修改
+     */
+    public SeckillDeductResult deduct(Long activityId, Long userId) {
+        Long result = redisTemplate.execute(deductScript,
+                List.of(stockKey(activityId), buyersKey(activityId), startKey(activityId), endKey(activityId)),
+                String.valueOf(System.currentTimeMillis()), String.valueOf(userId));
+        return SeckillDeductResult.fromCode(result == null ? SeckillDeductResult.UNKNOWN.getCode() : result);
+    }
+
+    /**
+     * 回补库存并移除买家标记，用于消息发送失败补偿与超时关单
+     *
+     * @return 是否真正回补成功
+     */
+    public boolean restore(Long activityId, Long userId) {
+        Long result = redisTemplate.execute(restoreScript,
+                List.of(stockKey(activityId), buyersKey(activityId)),
+                userId == null ? "" : String.valueOf(userId),
+                String.valueOf(maxStock(activityId)));
+        if (result == null || result <= 0) {
+            log.warn("活动 {} 回补未生效，返回值 {}，用户 {}", activityId, result, userId);
+            return false;
+        }
+        log.info("活动 {} 回补库存，移除买家 {}", activityId, userId);
+        return true;
+    }
+
+    /**
+     * 判断用户是否已占用库存，用于区分「排队中」与「未参与」
+     */
+    public boolean isBuyer(Long activityId, Long userId) {
+        return Boolean.TRUE.equals(redisTemplate.opsForSet().isMember(buyersKey(activityId), String.valueOf(userId)));
+    }
+
+    public void evict(Long activityId) {
+        redisTemplate.delete(allKeys(activityId));
+    }
+
+    private List<String> allKeys(Long activityId) {
+        return List.of(stockKey(activityId), buyersKey(activityId), startKey(activityId),
+                endKey(activityId), totalKey(activityId));
+    }
+
+    private int maxStock(Long activityId) {
+        String total = redisTemplate.opsForValue().get(totalKey(activityId));
+        if (total != null) {
+            return Integer.parseInt(total);
+        }
+        SeckillActivity activity = activityMapper.selectById(activityId);
+        return activity == null ? Integer.MAX_VALUE : activity.getTotalStock();
+    }
+
+    private Duration keyTtl(SeckillActivity activity) {
+        LocalDateTime expireAt = activity.getEndTime().plus(KEY_RETENTION_AFTER_END);
+        Duration ttl = Duration.between(LocalDateTime.now(), expireAt);
+        return ttl.isNegative() ? KEY_RETENTION_AFTER_END : ttl;
+    }
+
+    private long toMillis(LocalDateTime time) {
+        return time.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+    }
+
+    private String stockKey(Long activityId) {
+        return KEY_PREFIX + "stock:" + activityId;
+    }
+
+    private String buyersKey(Long activityId) {
+        return KEY_PREFIX + "buyers:" + activityId;
+    }
+
+    private String startKey(Long activityId) {
+        return KEY_PREFIX + "start:" + activityId;
+    }
+
+    private String endKey(Long activityId) {
+        return KEY_PREFIX + "end:" + activityId;
+    }
+
+    private String totalKey(Long activityId) {
+        return KEY_PREFIX + "total:" + activityId;
+    }
+
+    private DefaultRedisScript<Long> loadScript(String path) {
+        try {
+            String script = new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
+            return new DefaultRedisScript<>(script, Long.class);
+        } catch (IOException e) {
+            throw new UncheckedIOException("加载秒杀脚本失败：" + path, e);
+        }
+    }
+}
