@@ -116,7 +116,9 @@ services:
       - mall-net
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.6
+    build:
+      context: ./docker/elasticsearch
+    image: mall/elasticsearch-ik:8.17.6
     container_name: mall-elasticsearch
     environment:
       TZ: ${TZ:-Asia/Shanghai}
