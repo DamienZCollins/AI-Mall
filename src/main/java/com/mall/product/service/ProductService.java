@@ -21,7 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 商品维护与查询
@@ -143,6 +146,19 @@ public class ProductService {
             throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND);
         }
         return ProductView.from(product);
+    }
+
+    /**
+     * 按 ID 批量查询，不限状态，供其它模块批量组装数据使用
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, ProductView> findViewsByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        return productMapper.selectList(Wrappers.<Product>lambdaQuery().in(Product::getId, ids)).stream()
+                .map(ProductView::from)
+                .collect(Collectors.toMap(ProductView::id, view -> view, (a, b) -> a));
     }
 
     private void publishChanged(Long productId) {
