@@ -7,6 +7,8 @@ mall:
     access-key: test
     secret-key: test
     init-bucket: false
+  seckill:
+    preheat-on-startup: false
   embedding:
     base-url: http://localhost:1/v1
     api-key: test

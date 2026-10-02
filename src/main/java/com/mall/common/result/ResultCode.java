@@ -29,7 +29,9 @@ public enum ResultCode {
     SECKILL_ORDER_NOT_FOUND(4006, "秒杀订单不存在"),
     SECKILL_ORDER_STATUS_ILLEGAL(4007, "订单状态不允许该操作"),
     SECKILL_ACTIVITY_TIME_ILLEGAL(4008, "活动时间不合法"),
-    SECKILL_PRICE_ILLEGAL(4009, "秒杀价必须低于商品原价");
+    SECKILL_PRICE_ILLEGAL(4009, "秒杀价必须低于商品原价"),
+    SECKILL_MQ_UNAVAILABLE(4010, "排队服务暂不可用，请稍后重试"),
+    SECKILL_QUEUING(4011, "抢购请求处理中");
 
     private final int code;
     private final String message;

@@ -6,6 +6,12 @@ spring:
     username: ${MYSQL_USER}
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3s
   elasticsearch:
     uris: http://${ELASTICSEARCH_HOST:localhost}:${ELASTICSEARCH_PORT:9200}
 
@@ -29,6 +35,12 @@ mall:
   search:
     index-alias: ${ELASTICSEARCH_INDEX_PRODUCT:mall_product}
     index-name: ${ELASTICSEARCH_INDEX_PRODUCT:mall_product}_v1
+  rocketmq:
+    endpoints: ${ROCKETMQ_PROXY_ENDPOINT:localhost:8081}
+    order-topic: ${ROCKETMQ_SECKILL_ORDER_TOPIC:mall-seckill-order}
+    timeout-topic: ${ROCKETMQ_SECKILL_TIMEOUT_TOPIC:mall-seckill-timeout}
+    order-consumer-group: ${ROCKETMQ_ORDER_CONSUMER_GROUP:mall-seckill-order-consumer}
+    timeout-consumer-group: ${ROCKETMQ_TIMEOUT_CONSUMER_GROUP:mall-seckill-timeout-consumer}
 
 mybatis-plus:
   configuration:
