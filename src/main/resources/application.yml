@@ -6,6 +6,8 @@ spring:
     username: ${MYSQL_USER}
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  elasticsearch:
+    uris: http://${ELASTICSEARCH_HOST:localhost}:${ELASTICSEARCH_PORT:9200}
 
 mall:
   jwt:
@@ -19,6 +21,14 @@ mall:
     bucket: ${RUSTFS_BUCKET_PRODUCT:mall-product}
     public-base-url: ${RUSTFS_PUBLIC_BASE_URL:http://localhost:9000/mall-product}
     init-bucket: ${RUSTFS_INIT_BUCKET:true}
+  embedding:
+    base-url: ${EMBEDDING_BASE_URL}
+    api-key: ${EMBEDDING_API_KEY}
+    model: ${EMBEDDING_MODEL:Qwen/Qwen3-Embedding-0.6B}
+    dimensions: ${EMBEDDING_DIMENSIONS:1024}
+  search:
+    index-alias: ${ELASTICSEARCH_INDEX_PRODUCT:mall_product}
+    index-name: ${ELASTICSEARCH_INDEX_PRODUCT:mall_product}_v1
 
 mybatis-plus:
   configuration:

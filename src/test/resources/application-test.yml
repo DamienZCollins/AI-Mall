@@ -7,6 +7,11 @@ mall:
     access-key: test
     secret-key: test
     init-bucket: false
+  embedding:
+    base-url: http://localhost:1/v1
+    api-key: test
+    model: test-model
+    dimensions: 1024
 
 spring:
   datasource:
