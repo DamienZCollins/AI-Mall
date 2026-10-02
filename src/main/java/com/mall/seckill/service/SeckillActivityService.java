@@ -16,6 +16,8 @@ import com.mall.seckill.entity.SeckillStatus;
 import com.mall.seckill.entity.SeckillStock;
 import com.mall.seckill.mapper.SeckillActivityMapper;
 import com.mall.seckill.mapper.SeckillStockMapper;
+import com.mall.seckill.mq.SeckillActivityChangedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,12 +42,14 @@ public class SeckillActivityService {
     private final SeckillActivityMapper activityMapper;
     private final SeckillStockMapper stockMapper;
     private final ProductService productService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public SeckillActivityService(SeckillActivityMapper activityMapper, SeckillStockMapper stockMapper,
-                                  ProductService productService) {
+                                  ProductService productService, ApplicationEventPublisher eventPublisher) {
         this.activityMapper = activityMapper;
         this.stockMapper = stockMapper;
         this.productService = productService;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -80,6 +84,7 @@ public class SeckillActivityService {
         stock.setStock(request.totalStock());
         stockMapper.insert(stock);
 
+        publishChanged(activity.getId());
         return toView(activity, product);
     }
 
@@ -104,6 +109,7 @@ public class SeckillActivityService {
         }
         activity.setUpdateTime(LocalDateTime.now());
         activityMapper.updateById(activity);
+        publishChanged(activity.getId());
         return toView(activity, productService.getById(activity.getProductId()));
     }
 
@@ -209,5 +215,9 @@ public class SeckillActivityService {
 
     private ProductView requireOnSaleProduct(Long productId) {
         return productService.getOnSale(productId);
+    }
+
+    private void publishChanged(Long activityId) {
+        eventPublisher.publishEvent(new SeckillActivityChangedEvent(activityId));
     }
 }

@@ -11,12 +11,14 @@ import com.mall.seckill.entity.SeckillOrder;
 import com.mall.seckill.entity.SeckillOrderStatus;
 import com.mall.seckill.mapper.SeckillOrderMapper;
 import com.mall.seckill.mapper.SeckillStockMapper;
+import com.mall.seckill.mq.SeckillOrderMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -36,13 +38,16 @@ public class SeckillOrderService {
     private final SeckillStockMapper stockMapper;
     private final SeckillActivityService activityService;
     private final ProductService productService;
+    private final SeckillRedisService redisService;
 
     public SeckillOrderService(SeckillOrderMapper orderMapper, SeckillStockMapper stockMapper,
-                               SeckillActivityService activityService, ProductService productService) {
+                               SeckillActivityService activityService, ProductService productService,
+                               SeckillRedisService redisService) {
         this.orderMapper = orderMapper;
         this.stockMapper = stockMapper;
         this.activityService = activityService;
         this.productService = productService;
+        this.redisService = redisService;
     }
 
     /**
@@ -99,6 +104,77 @@ public class SeckillOrderService {
     @Transactional
     public SeckillOrderView getOrder(String orderNo) {
         return SeckillOrderView.from(requireOrder(orderNo));
+    }
+
+    /**
+     * 消费端创建订单，库存已在 Redis 预扣，这里落库并同步扣减数据库库存
+     *
+     * <p>幂等依赖 uk_user_activity，重复消息由唯一索引拒绝后由调用方按已处理对待
+     *
+     * @throws BusinessException 数据库库存扣减失败，调用方应重投消息而非吞掉
+     */
+    @Transactional
+    public SeckillOrder createFromMessage(SeckillOrderMessage message) {
+        SeckillOrder order = new SeckillOrder();
+        order.setOrderNo(message.orderNo());
+        order.setUserId(message.userId());
+        order.setActivityId(message.activityId());
+        order.setProductId(message.productId());
+        order.setProductName(message.productName());
+        order.setSeckillPrice(new BigDecimal(message.seckillPrice()));
+        order.setStatus(SeckillOrderStatus.PENDING_PAYMENT.getCode());
+        order.setExpireTime(LocalDateTime.now().plusMinutes(message.payTimeoutMinutes()));
+        orderMapper.insert(order);
+
+        // 数据库库存是最终一致性的落点，扣不动说明两侧不一致，抛出让消息重投
+        if (stockMapper.deduct(message.activityId()) == 0) {
+            log.error("数据库库存扣减失败，activityId={} orderNo={}", message.activityId(), message.orderNo());
+            throw new BusinessException(ResultCode.SECKILL_SOLD_OUT.getCode(), "数据库库存扣减失败");
+        }
+        return order;
+    }
+
+    /**
+     * 延迟消息到期后的关单：条件流转成功才回补，重复投递不会重复回补
+     */
+    @Transactional
+    public void cancelByTimeout(String orderNo) {
+        SeckillOrder order = orderMapper.selectOne(
+                Wrappers.<SeckillOrder>lambdaQuery().eq(SeckillOrder::getOrderNo, orderNo));
+        if (order == null) {
+            log.info("订单 {} 不存在，无需关单", orderNo);
+            return;
+        }
+        if (!Integer.valueOf(SeckillOrderStatus.PENDING_PAYMENT.getCode()).equals(order.getStatus())) {
+            log.info("订单 {} 当前状态为 {}，无需关单", orderNo, order.getStatus());
+            return;
+        }
+        int affected = orderMapper.transferStatus(orderNo, SeckillOrderStatus.PENDING_PAYMENT.getCode(),
+                SeckillOrderStatus.TIMEOUT_CANCELLED.getCode(), null);
+        if (affected == 0) {
+            log.info("订单 {} 状态已被其它路径流转，跳过关单", orderNo);
+            return;
+        }
+        restoreStock(order);
+        // 让用户能重新抢购，同时把资格还回库里
+        redisService.restore(order.getActivityId(), order.getUserId());
+        log.info("订单 {} 已超时关单并回补库存", orderNo);
+    }
+
+    @Transactional(readOnly = true)
+    public long countByUserAndActivity(Long userId, Long activityId) {
+        Long count = orderMapper.selectCount(Wrappers.<SeckillOrder>lambdaQuery()
+                .eq(SeckillOrder::getUserId, userId)
+                .eq(SeckillOrder::getActivityId, activityId));
+        return count == null ? 0 : count;
+    }
+
+    @Transactional(readOnly = true)
+    public SeckillOrderView findByUserAndActivity(Long userId, Long activityId) {
+        SeckillOrder order = orderMapper.selectOne(Wrappers.<SeckillOrder>lambdaQuery()
+                .eq(SeckillOrder::getUserId, userId)
+                .eq(SeckillOrder::getActivityId, activityId));
+        return order == null ? null : SeckillOrderView.from(order);
     }
 
     /**
