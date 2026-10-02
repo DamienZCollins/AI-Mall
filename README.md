@@ -36,13 +36,25 @@ mvn spring-boot:run
 | GET | `/api/auth/me` | 登录 | 当前登录用户 |
 | GET | `/api/products` | 公开 | 分页查询上架商品 |
 | GET | `/api/products/{id}` | 公开 | 上架商品详情 |
+| GET | `/api/search` | 公开 | 关键词 + 语义混合搜索 |
 | POST | `/api/admin/products` | ADMIN | 新增商品 |
 | PUT | `/api/admin/products/{id}` | ADMIN | 编辑商品 |
 | PATCH | `/api/admin/products/{id}/status` | ADMIN | 上架 / 下架 |
 | GET | `/api/admin/products` | ADMIN | 分页查询商品（含下架） |
 | POST | `/api/admin/products/images` | ADMIN | 上传商品图片 |
+| POST | `/api/admin/search/reindex` | ADMIN | 全量重建商品索引 |
 
 带权限的接口需携带 `Authorization: Bearer <token>`。接口文档：`/swagger-ui/index.html`。
+
+## 混合搜索
+
+商品写入 Elasticsearch 时把「名称 + 品牌 + 卖点 + 描述」向量化存入 `dense_vector` 字段；
+检索时同时发起 BM25 关键词召回与 kNN 语义召回，两路结果按 RRF（`Σ 1/(k+rank)`，k=60）融合。
+品牌型号这类精确查询靠 BM25 稳定命中，自然语言描述靠 kNN 召回语义相关商品。
+
+Elasticsearch 使用自建镜像 `docker/elasticsearch/Dockerfile`，额外安装了 analysis-ik 分词插件，
+否则中文会被切成单字。首次使用需先 `docker compose build elasticsearch`。
+
 
 ## 开发环境
 
