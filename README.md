@@ -39,7 +39,8 @@ mvn spring-boot:run
 | GET | `/api/search` | 公开 | 关键词 + 语义混合搜索 |
 | GET | `/api/seckill/activities` | 公开 | 分页查询秒杀活动 |
 | GET | `/api/seckill/activities/{id}` | 公开 | 秒杀活动详情 |
-| POST | `/api/seckill/{activityId}` | 登录 | 抢购下单 |
+| POST | `/api/seckill/{activityId}` | 登录 | 抢购下单，Redis 预扣后立即返回 |
+| GET | `/api/seckill/{activityId}/result` | 登录 | 轮询抢购结果 |
 | GET | `/api/seckill/orders/{orderNo}` | 登录 | 查询秒杀订单 |
 | POST | `/api/seckill/orders/{orderNo}/pay` | 登录 | 模拟支付回调 |
 | POST | `/api/admin/products` | ADMIN | 新增商品 |
@@ -56,10 +57,12 @@ mvn spring-boot:run
 
 ## 秒杀
 
-活动与库存分表，防超卖靠数据库条件更新 `UPDATE seckill_stock SET stock = stock - 1
-WHERE activity_id = ? AND stock > 0`，影响行数为 0 即售罄；防重复下单靠 `seckill_order`
-上的唯一索引 `(user_id, activity_id)`，不依赖先查后插。待支付订单由定时任务扫描超时后
-取消并回补库存，回补通过条件更新的影响行数保证不会重复执行。
+活动库存预热到 Redis，抢购请求由 Lua 脚本在 Redis 内一次性完成时间校验、用户去重与库存扣减，
+成功后投递 RocketMQ 异步创建订单，接口立即返回而不等待数据库事务。
+订单落库后投递延迟消息，到期检查仍未支付则关单并回补库存。
+Redis 与数据库两侧都会扣减与回补，数据库约束作为最后一道防线：防重复靠唯一索引
+`(user_id, activity_id)`，防超卖靠条件更新 `WHERE stock > 0`，回补靠条件更新的影响行数避免重复执行。
+消息投递失败时立即回补 Redis 预扣，不会出现「库存扣了但没有订单」的悬空状态。
 
 
 ## 混合搜索
@@ -106,8 +109,22 @@ Elasticsearch 使用自建镜像 `docker/elasticsearch/Dockerfile`，额外安�
 | `search_check.py` | 对比 RRF 融合、BM25、kNN 三路检索结果 |
 | `sync_check.py` | 商品变更到 Elasticsearch 索引的同步链路 |
 | `seckill_check.py` | 秒杀防超卖、防重复下单、状态机、超时回补（含并发） |
+| `seckill_async_check.py` | Redis 预扣、MQ 异步下单、延迟消息关单、MQ 降级 |
 
-`seckill_check.py` 需要并发账号，先执行 `sql/data-seckill-test.sql` 写入测试用户。
+`seckill_check.py` 与 `seckill_async_check.py` 需要并发账号，先执行 `sql/data-seckill-test.sql` 写入测试用户。
+
+## RocketMQ 主题
+
+首次使用需建主题：
+
+```bash
+sh scripts/init-rocketmq-topics.sh
+docker compose restart rocketmq-proxy
+```
+
+RocketMQ 5.x 的主题要显式声明能接受的消息类型，普通消息与延迟消息不能放同一主题，
+因此拆成 `mall-seckill-order`(NORMAL) 与 `mall-seckill-timeout`(DELAY)。
+代理会缓存主题路由，新建主题后需要重启代理。
 
 ## 文档
 
