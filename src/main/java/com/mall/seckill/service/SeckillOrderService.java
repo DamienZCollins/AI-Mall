@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -154,7 +156,7 @@ public class SeckillOrderService {
         }
         restoreStock(order);
         // 让用户能重新抢购，同时把资格还回库里
-        redisService.restore(order.getActivityId(), order.getUserId());
+        restoreRedisAfterCommit(order);
         log.info("订单 {} 已超时关单并回补库存", orderNo);
     }
 
@@ -195,12 +197,31 @@ public class SeckillOrderService {
                 continue;
             }
             restoreStock(order);
+            // 延迟消息丢失时靠本任务兜底，Redis 买家标记和库存同样要还原
+            restoreRedisAfterCommit(order);
             cancelled++;
         }
         if (cancelled > 0) {
             log.info("超时取消订单 {} 条并回补库存", cancelled);
         }
         return cancelled;
+    }
+
+    /**
+     * 事务提交后再回补 Redis：提交失败时订单和库存都留在原状态，
+     * 避免买家标记先被移除而数据库又回滚，用户轮询结果与库内状态不一致
+     */
+    private void restoreRedisAfterCommit(SeckillOrder order) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                boolean restored = redisService.restore(order.getActivityId(), order.getUserId());
+                if (!restored) {
+                    log.warn("订单 {} 关单后 Redis 回补未生效，activityId={} userId={}",
+                            order.getOrderNo(), order.getActivityId(), order.getUserId());
+                }
+            }
+        });
     }
 
     private void restoreStock(SeckillOrder order) {
