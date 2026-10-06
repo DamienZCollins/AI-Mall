@@ -6,6 +6,7 @@ import com.mall.common.result.ResultCode;
 import com.mall.seckill.entity.SeckillActivity;
 import com.mall.seckill.entity.SeckillStock;
 import com.mall.seckill.mapper.SeckillActivityMapper;
+import com.mall.seckill.mapper.SeckillOrderMapper;
 import com.mall.seckill.mapper.SeckillStockMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,25 +43,53 @@ public class SeckillRedisService {
     /** 活动结束后 Key 的保留时长，用于支持活动结束后的结果查询 */
     private static final Duration KEY_RETENTION_AFTER_END = Duration.ofDays(1);
 
+    /** 预热锁的持有时间，超时自动释放，避免持锁线程异常退出后卡死后续预热 */
+    private static final Duration PREHEAT_LOCK_TTL = Duration.ofSeconds(10);
+
+    /** 未抢到预热锁时的等待上限与轮询间隔 */
+    private static final long PREHEAT_WAIT_MILLIS = 2_000L;
+    private static final long PREHEAT_POLL_MILLIS = 50L;
+
     private final StringRedisTemplate redisTemplate;
     private final SeckillActivityMapper activityMapper;
     private final SeckillStockMapper stockMapper;
+    private final SeckillOrderMapper orderMapper;
     private final DefaultRedisScript<Long> deductScript;
     private final DefaultRedisScript<Long> restoreScript;
 
     public SeckillRedisService(StringRedisTemplate redisTemplate, SeckillActivityMapper activityMapper,
-                               SeckillStockMapper stockMapper) {
+                               SeckillStockMapper stockMapper, SeckillOrderMapper orderMapper) {
         this.redisTemplate = redisTemplate;
         this.activityMapper = activityMapper;
         this.stockMapper = stockMapper;
+        this.orderMapper = orderMapper;
         this.deductScript = loadScript(DEDUCT_SCRIPT);
         this.restoreScript = loadScript(RESTORE_SCRIPT);
     }
 
     /**
-     * 把活动库存从数据库加载到 Redis，重复预热会重置库存与买家集合
+     * 把活动状态从数据库完整重建到 Redis：库存取秒杀库存表，买家集合按已存在的订单行回填
+     *
+     * <p>买家集合必须回填而不是清空：uk_user_activity 限定终身一单，
+     * 清空后已下单的用户会再次通过预扣，消费端虽被唯一索引拦下，Redis 库存却已经扣掉，
+     * 变成只减不还的静默泄漏
+     *
+     * <p>并发预热会互相删除对方刚写入的状态，用短锁收敛成一次
      */
     public void preheat(Long activityId) {
+        if (!Boolean.TRUE.equals(redisTemplate.opsForValue()
+                .setIfAbsent(preheatLockKey(activityId), "1", PREHEAT_LOCK_TTL))) {
+            awaitPreheated(activityId);
+            return;
+        }
+        try {
+            rebuild(activityId);
+        } finally {
+            redisTemplate.delete(preheatLockKey(activityId));
+        }
+    }
+
+    private void rebuild(Long activityId) {
         SeckillActivity activity = activityMapper.selectById(activityId);
         if (activity == null) {
             throw new BusinessException(ResultCode.SECKILL_ACTIVITY_NOT_FOUND);
@@ -70,9 +99,9 @@ public class SeckillRedisService {
         if (stock == null) {
             throw new BusinessException(ResultCode.SECKILL_ACTIVITY_NOT_FOUND.getCode(), "活动缺少库存记录");
         }
+        List<Long> buyers = orderMapper.selectUserIdsByActivityId(activityId);
 
         Duration ttl = keyTtl(activity);
-        // 先删后写，避免重复预热时残留的买家标记让用户无法下单
         redisTemplate.delete(allKeys(activityId));
 
         redisTemplate.opsForValue().set(stockKey(activityId), String.valueOf(stock.getStock()), ttl);
@@ -82,9 +111,32 @@ public class SeckillRedisService {
 
         String buyersKey = buyersKey(activityId);
         redisTemplate.opsForSet().add(buyersKey, SET_PLACEHOLDER);
+        if (!buyers.isEmpty()) {
+            redisTemplate.opsForSet().add(buyersKey,
+                    buyers.stream().map(String::valueOf).toArray(String[]::new));
+        }
         redisTemplate.expire(buyersKey, ttl);
 
-        log.info("活动 {} 预热完成，库存 {}，总量 {}", activityId, stock.getStock(), activity.getTotalStock());
+        log.info("活动 {} 预热完成，库存 {}，总量 {}，回填买家 {} 个",
+                activityId, stock.getStock(), activity.getTotalStock(), buyers.size());
+    }
+
+    /**
+     * 等待持锁线程预热完成；超时后由调用方的预扣逻辑决定如何响应
+     */
+    private void awaitPreheated(Long activityId) {
+        long deadline = System.currentTimeMillis() + PREHEAT_WAIT_MILLIS;
+        while (System.currentTimeMillis() < deadline) {
+            if (isPreheated(activityId)) {
+                return;
+            }
+            try {
+                Thread.sleep(PREHEAT_POLL_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     public boolean isPreheated(Long activityId) {
@@ -188,6 +240,10 @@ public class SeckillRedisService {
 
     private String totalKey(Long activityId) {
         return KEY_PREFIX + "total:" + activityId;
+    }
+
+    private String preheatLockKey(Long activityId) {
+        return KEY_PREFIX + "preheat:lock:" + activityId;
     }
 
     private DefaultRedisScript<Long> loadScript(String path) {

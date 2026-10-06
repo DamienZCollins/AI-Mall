@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.mall.seckill.entity.SeckillOrder;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 秒杀订单数据访问
@@ -23,4 +25,12 @@ public interface SeckillOrderMapper extends BaseMapper<SeckillOrder> {
                        @Param("source") Integer source,
                        @Param("target") Integer target,
                        @Param("payTime") LocalDateTime payTime);
+
+    /**
+     * 取活动下所有下过单的用户，供预热回填买家集合
+     *
+     * <p>不按状态过滤：uk_user_activity 限定终身一单，已取消的订单同样占用该用户的资格
+     */
+    @Select("SELECT user_id FROM seckill_order WHERE activity_id = #{activityId}")
+    List<Long> selectUserIdsByActivityId(@Param("activityId") Long activityId);
 }
