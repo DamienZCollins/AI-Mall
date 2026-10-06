@@ -87,17 +87,6 @@ public class SeckillService {
         return SeckillResultView.failed();
     }
 
-    /**
-     * 活动创建或编辑后重新预热
-     */
-    public void preheat(Long activityId) {
-        redisService.preheat(activityId);
-    }
-
-    public void evict(Long activityId) {
-        redisService.evict(activityId);
-    }
-
     private SeckillOrderMessage buildMessage(SeckillActivity activity, Long userId) {
         ProductView product = productService.getById(activity.getProductId());
         return new SeckillOrderMessage(

@@ -154,19 +154,6 @@ public class SeckillActivityService {
         return activity;
     }
 
-    /**
-     * 时间窗口校验，未开始与已结束分别返回可区分的错误
-     */
-    public void requireRunning(SeckillActivity activity) {
-        SeckillStatus status = statusOf(activity);
-        if (status == SeckillStatus.NOT_STARTED) {
-            throw new BusinessException(ResultCode.SECKILL_NOT_STARTED);
-        }
-        if (status == SeckillStatus.ENDED || status == SeckillStatus.CLOSED) {
-            throw new BusinessException(ResultCode.SECKILL_ENDED);
-        }
-    }
-
     public SeckillStatus statusOf(SeckillActivity activity) {
         return SeckillStatus.of(Integer.valueOf(ENABLED).equals(activity.getStatus()),
                 activity.getStartTime(), activity.getEndTime(), LocalDateTime.now());
