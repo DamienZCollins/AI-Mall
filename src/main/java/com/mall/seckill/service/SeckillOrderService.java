@@ -155,7 +155,7 @@ public class SeckillOrderService {
             return;
         }
         restoreStock(order);
-        // 让用户能重新抢购，同时把资格还回库里
+        // 库存还给活动，但买家标记保留：uk_user_activity 限定终身一单
         restoreRedisAfterCommit(order);
         log.info("订单 {} 已超时关单并回补库存", orderNo);
     }
@@ -209,16 +209,16 @@ public class SeckillOrderService {
 
     /**
      * 事务提交后再回补 Redis：提交失败时订单和库存都留在原状态，
-     * 避免买家标记先被移除而数据库又回滚，用户轮询结果与库内状态不一致
+     * 避免库存先被回补而数据库又回滚，两侧状态不一致
      */
     private void restoreRedisAfterCommit(SeckillOrder order) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                boolean restored = redisService.restore(order.getActivityId(), order.getUserId());
+                boolean restored = redisService.restoreStockOnly(order.getActivityId());
                 if (!restored) {
-                    log.warn("订单 {} 关单后 Redis 回补未生效，activityId={} userId={}",
-                            order.getOrderNo(), order.getActivityId(), order.getUserId());
+                    log.warn("订单 {} 关单后 Redis 库存回补未生效，activityId={}",
+                            order.getOrderNo(), order.getActivityId());
                 }
             }
         });

@@ -120,6 +120,22 @@ public class SeckillRedisService {
     }
 
     /**
+     * 只回补库存不移除买家标记，用于超时关单：uk_user_activity 限定终身一单，
+     * 释放的库存留给其他用户，本人不能再抢
+     */
+    public boolean restoreStockOnly(Long activityId) {
+        Long result = redisTemplate.execute(restoreScript,
+                List.of(stockKey(activityId), buyersKey(activityId)),
+                "", String.valueOf(maxStock(activityId)));
+        if (result == null || result <= 0) {
+            log.warn("活动 {} 库存回补未生效，返回值 {}", activityId, result);
+            return false;
+        }
+        log.info("活动 {} 回补库存，买家标记保留", activityId);
+        return true;
+    }
+
+    /**
      * 判断用户是否已占用库存，用于区分「排队中」与「未参与」
      */
     public boolean isBuyer(Long activityId, Long userId) {
