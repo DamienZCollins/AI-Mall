@@ -48,6 +48,8 @@ public class ProductIndexService {
 
     /**
      * 同步单个商品，embedding 失败时只写业务字段，保证 BM25 仍能召回
+     *
+     * @throws IllegalStateException ES 写入失败，由调用方决定重试或兜底
      */
     public void sync(ProductView product) {
         float[] embedding = null;
@@ -69,6 +71,7 @@ public class ProductIndexService {
             log.debug("商品 {} 已同步索引，hasVector={}", product.id(), doc.hasVector());
         } catch (IOException | RuntimeException e) {
             log.error("商品 {} 同步索引失败", product.id(), e);
+            throw new IllegalStateException("商品 " + product.id() + " 同步索引失败", e);
         }
     }
 
