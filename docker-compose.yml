@@ -143,6 +143,9 @@ services:
       context: ./docker/elasticsearch
     image: mall/elasticsearch-ik:8.17.6
     container_name: mall-elasticsearch
+    # 显式指定主机名：Docker Desktop 重启后容器常解析不了自己的短 ID 主机名，
+    # ES 启动时会做 getLocalHost 校验并直接退出
+    hostname: mall-es-node
     environment:
       TZ: ${TZ:-Asia/Shanghai}
       cluster.name: mall-es
