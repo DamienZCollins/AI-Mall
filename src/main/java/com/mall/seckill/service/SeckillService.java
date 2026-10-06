@@ -14,9 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.time.format.DateTimeFormatter;
-import java.util.concurrent.ThreadLocalRandom;
-
 /**
  * 抢购入口：Redis 原子预扣 + 投递 MQ，数据库只承担最终落库
  */
@@ -24,7 +21,6 @@ import java.util.concurrent.ThreadLocalRandom;
 public class SeckillService {
 
     private static final Logger log = LoggerFactory.getLogger(SeckillService.class);
-    private static final DateTimeFormatter ORDER_NO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final SeckillActivityService activityService;
     private final SeckillRedisService redisService;
@@ -105,7 +101,7 @@ public class SeckillService {
     private SeckillOrderMessage buildMessage(SeckillActivity activity, Long userId) {
         ProductView product = productService.getById(activity.getProductId());
         return new SeckillOrderMessage(
-                generateOrderNo(),
+                SeckillOrderNo.generate(userId, activity.getId()),
                 userId,
                 activity.getId(),
                 product.id(),
@@ -120,12 +116,8 @@ public class SeckillService {
             case ENDED -> new BusinessException(ResultCode.SECKILL_ENDED);
             case SOLD_OUT -> new BusinessException(ResultCode.SECKILL_SOLD_OUT);
             case DUPLICATE -> new BusinessException(ResultCode.SECKILL_DUPLICATE_ORDER);
-            default -> new BusinessException(ResultCode.SECKILL_ACTIVITY_NOT_FOUND);
+            case NOT_PREHEATED -> new BusinessException(ResultCode.SECKILL_ACTIVITY_NOT_FOUND);
+            default -> new BusinessException(ResultCode.INTERNAL_ERROR);
         };
-    }
-
-    private String generateOrderNo() {
-        return "SK" + java.time.LocalDateTime.now().format(ORDER_NO_FORMATTER)
-                + ThreadLocalRandom.current().nextInt(1000, 10000);
     }
 }

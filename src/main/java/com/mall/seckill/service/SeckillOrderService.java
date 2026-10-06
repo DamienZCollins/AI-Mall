@@ -20,9 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 抢购下单与支付，正确性由数据库约束保证：库存靠条件更新，去重靠唯一索引
@@ -31,7 +29,6 @@ import java.util.concurrent.ThreadLocalRandom;
 public class SeckillOrderService {
 
     private static final Logger log = LoggerFactory.getLogger(SeckillOrderService.class);
-    private static final DateTimeFormatter ORDER_NO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final int MAX_TIMEOUT_SCAN = 200;
 
     private final SeckillOrderMapper orderMapper;
@@ -218,7 +215,7 @@ public class SeckillOrderService {
 
     private SeckillOrder buildOrder(SeckillActivity activity, ProductView product, Long userId) {
         SeckillOrder order = new SeckillOrder();
-        order.setOrderNo(generateOrderNo());
+        order.setOrderNo(SeckillOrderNo.generate(userId, activity.getId()));
         order.setUserId(userId);
         order.setActivityId(activity.getId());
         order.setProductId(product.id());
@@ -236,13 +233,5 @@ public class SeckillOrderService {
             throw new BusinessException(ResultCode.SECKILL_ORDER_NOT_FOUND);
         }
         return order;
-    }
-
-    /**
-     * 订单号：SK + 时间戳 + 四位随机数
-     */
-    private String generateOrderNo() {
-        return "SK" + LocalDateTime.now().format(ORDER_NO_FORMATTER)
-                + ThreadLocalRandom.current().nextInt(1000, 10000);
     }
 }
