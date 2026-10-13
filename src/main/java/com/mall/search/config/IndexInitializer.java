@@ -1,4 +1,4 @@
-package com.mall.config.search;
+package com.mall.search.config;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.fasterxml.jackson.databind.JsonNode;

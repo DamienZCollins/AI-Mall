@@ -1,4 +1,4 @@
-package com.mall.common.embedding;
+package com.mall.search.embedding;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;

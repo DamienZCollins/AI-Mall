@@ -4,7 +4,7 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.BulkRequest;
 import co.elastic.clients.elasticsearch.core.BulkResponse;
 import co.elastic.clients.elasticsearch._types.Refresh;
-import com.mall.common.embedding.EmbeddingClient;
+import com.mall.search.embedding.EmbeddingClient;
 import com.mall.common.result.PageResult;
 import com.mall.product.dto.ProductQuery;
 import com.mall.product.dto.ProductView;

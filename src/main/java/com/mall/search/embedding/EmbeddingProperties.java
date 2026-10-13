@@ -1,4 +1,4 @@
-package com.mall.common.embedding;
+package com.mall.search.embedding;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
