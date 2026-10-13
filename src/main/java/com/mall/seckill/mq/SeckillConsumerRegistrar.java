@@ -1,6 +1,5 @@
 package com.mall.seckill.mq;
 
-import com.mall.config.rocketmq.RocketMqProperties;
 import org.apache.rocketmq.client.apis.consumer.PushConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

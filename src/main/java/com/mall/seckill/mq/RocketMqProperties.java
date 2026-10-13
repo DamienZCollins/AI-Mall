@@ -1,4 +1,4 @@
-package com.mall.config.rocketmq;
+package com.mall.seckill.mq;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

@@ -4,8 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mall.common.exception.BusinessException;
 import com.mall.common.result.ResultCode;
-import com.mall.config.rocketmq.RocketMqConfig;
-import com.mall.config.rocketmq.RocketMqProperties;
 import org.apache.rocketmq.client.apis.ClientServiceProvider;
 import org.apache.rocketmq.client.apis.message.MessageBuilder;
 import org.apache.rocketmq.client.apis.producer.Producer;

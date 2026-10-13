@@ -2,8 +2,6 @@ package com.mall.seckill.mq;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mall.config.rocketmq.RocketMqConfig;
-import com.mall.config.rocketmq.RocketMqProperties;
 import com.mall.seckill.service.SeckillOrderService;
 import org.apache.rocketmq.client.apis.ClientServiceProvider;
 import org.apache.rocketmq.client.apis.consumer.ConsumeResult;

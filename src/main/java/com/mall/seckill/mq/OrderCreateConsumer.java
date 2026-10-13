@@ -3,8 +3,6 @@ package com.mall.seckill.mq;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mall.config.rocketmq.RocketMqConfig;
-import com.mall.config.rocketmq.RocketMqProperties;
 import com.mall.seckill.entity.SeckillActivity;
 import com.mall.seckill.entity.SeckillOrder;
 import com.mall.seckill.service.SeckillActivityService;
