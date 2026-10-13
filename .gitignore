@@ -29,6 +29,7 @@ nohup.out
 .settings/
 .project
 .classpath
+.factorypath
 
 # 操作系统
 .DS_Store
