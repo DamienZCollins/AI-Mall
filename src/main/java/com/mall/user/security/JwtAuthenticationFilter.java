@@ -1,4 +1,4 @@
-package com.mall.config.security;
+package com.mall.user.security;
 
 import com.mall.common.security.AuthUser;
 import com.mall.common.security.JwtUtil;

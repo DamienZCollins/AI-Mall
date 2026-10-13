@@ -1,6 +1,7 @@
 package com.mall.config.security;
 
 import com.mall.common.security.JwtProperties;
+import com.mall.user.security.JwtAuthenticationFilter;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
