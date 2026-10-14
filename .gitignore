@@ -48,6 +48,12 @@ desktop.ini
 /scripts/*
 !/scripts/api_check.py
 !/scripts/init-rocketmq-topics.sh
+!/scripts/start.ps1
 
 # 并发验证用测试数据
 /sql/data-seckill-test.sql
+/sql/data-seckill-load.sql
+
+# 压测产物（原始结果与令牌只保留在本地）
+/scripts/jmeter/
+result/
