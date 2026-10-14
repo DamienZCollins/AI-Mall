@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * 秒杀消息生产者
@@ -32,6 +34,9 @@ public class SeckillMessageProducer {
     private final ClientServiceProvider provider;
     private final RocketMqProperties properties;
     private final Map<String, Producer> producers = new HashMap<>();
+
+    /** 保护 producers：构造生产者含网络 I/O，用 ReentrantLock 避免虚拟线程被钉在载体线程上 */
+    private final Lock producersLock = new ReentrantLock();
 
     public SeckillMessageProducer(ClientServiceProvider provider, RocketMqProperties properties) {
         this.provider = provider;
@@ -71,7 +76,8 @@ public class SeckillMessageProducer {
     }
 
     private Producer producerOf(String topic) {
-        synchronized (producers) {
+        producersLock.lock();
+        try {
             Producer producer = producers.get(topic);
             if (producer != null) {
                 return producer;
@@ -87,6 +93,8 @@ public class SeckillMessageProducer {
             }
             producers.put(topic, producer);
             return producer;
+        } finally {
+            producersLock.unlock();
         }
     }
 
