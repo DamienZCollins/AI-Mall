@@ -1,6 +1,9 @@
 spring:
   application:
     name: mall
+  threads:
+    virtual:
+      enabled: true
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:mall}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
     username: ${MYSQL_USER}
