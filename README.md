@@ -11,19 +11,14 @@
 # 1. 准备环境变量
 copy .env.example .env
 
-# 2. 启动本地中间件
-docker compose up -d
+# 2. 一键启动：构建应用、启动中间件、建表、初始化 RocketMQ 主题并启动应用
+powershell -ExecutionPolicy Bypass -File scripts/start.ps1
 
-# 3. 建表与初始化数据
-docker exec -i mall-mysql mysql -uroot -p1234 --default-character-set=utf8mb4 mall < sql/schema.sql
-docker exec -i mall-mysql mysql -uroot -p1234 --default-character-set=utf8mb4 mall < sql/data.sql
+# 可选：只启动中间件
+powershell -ExecutionPolicy Bypass -File scripts/start.ps1 -NoApp
 
-# 4. 查看状态
-docker compose ps
-
-# 5. 启动应用（凭据从 .env 读取）
-set -a && . ./.env && set +a
-mvn spring-boot:run
+# 可选：删除并重建 mall 数据库后启动
+powershell -ExecutionPolicy Bypass -File scripts/start.ps1 -ResetDb
 ```
 
 初始账号：`admin / admin123`（管理员）、`user / user123`（普通用户）。
