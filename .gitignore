@@ -68,6 +68,9 @@ desktop.ini
 /frontend/.env.local
 /frontend/.env.*.local
 
+# 本地商品图素材（应用使用的副本在 frontend/public/images/products）
+/素材/
+
 # 并发验证用测试数据
 /backend/sql/data-seckill-test.sql
 /backend/sql/data-seckill-load.sql
