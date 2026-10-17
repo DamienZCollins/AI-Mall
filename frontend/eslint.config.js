@@ -47,8 +47,8 @@ export default tseslint.config(
     },
   },
   {
-    // 联调证据采集脚本靠 stdout 输出原始响应，允许 console
-    files: ['tests/e2e/record-*.mjs'],
+    // 联调证据采集与截图脚本靠 stdout 输出进度，允许 console
+    files: ['tests/e2e/record-*.mjs', 'tests/e2e/capture-shots.mjs'],
     rules: {
       'no-console': 'off',
     },
