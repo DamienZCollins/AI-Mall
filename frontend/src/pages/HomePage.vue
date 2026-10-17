@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue';
 
 import type { Product } from '@/api/product';
-import { queryProducts } from '@/api/product';
+import { queryProducts } from '@/features/catalog/source';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import ProductCard from '@/components/ProductCard.vue';
@@ -18,19 +18,19 @@ const loading = ref(true);
 const error = ref<ApiError | Error | null>(null);
 
 const categories = [
-  { label: '数码', to: '/products?categoryId=1001' },
-  { label: '家居', to: '/products?categoryId=1002' },
-  { label: '个护', to: '/products?categoryId=1003' },
-  { label: '服饰', to: '/products' },
-  { label: '食品', to: '/products' },
-  { label: '更多', to: '/products' },
+  { label: '数码', to: '/products?categoryId=1001', img: '01_头戴式耳机_黑色黄底.jpg' },
+  { label: '家居', to: '/products?categoryId=1002', img: '10_墨绿绒面双人沙发.jpg' },
+  { label: '个护', to: '/products?categoryId=1003', img: '17_香氛蜡烛.jpg' },
+  { label: '服饰箱包', to: '/products?categoryId=1004', img: '26_深蓝通勤双肩包.jpg' },
+  { label: '食品饮品', to: '/products?categoryId=1005', img: '28_烘焙咖啡豆.jpg' },
+  { label: '生活方式', to: '/products?categoryId=1006', img: '40_桌面多肉盆栽.jpg' },
 ];
 
 async function load(): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
-    const result = await queryProducts({ page: 1, size: 12 });
+    const result = await queryProducts({ page: 1, size: 16 });
     const list = result.list;
     weekly.value = list.slice(0, 4);
     popular.value = list.slice(4, 12);
@@ -52,7 +52,7 @@ onMounted(load);
         <div class="hero__frame">
           <div class="hero__image">
             <img
-              src="/src/assets/hero-living-room.svg"
+              src="/images/products/36_%E7%B1%B3%E7%99%BD%E5%AE%A2%E5%8E%85%E5%9C%BA%E6%99%AF.jpg"
               alt="自然光下的米白客厅，浅色沙发与木质边几围出安静的日常空间"
               width="1600"
               height="1280"
@@ -104,10 +104,14 @@ onMounted(load);
             :to="item.to"
           >
             <span class="category-link__icon">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="7" />
-                <path d="M9 12h6" />
-              </svg>
+              <img
+                :src="`/images/products/${encodeURIComponent(item.img)}`"
+                alt=""
+                width="76"
+                height="76"
+                loading="lazy"
+                @error="handleImageError"
+              />
             </span>
             <span>{{ item.label }}</span>
           </RouterLink>
@@ -253,7 +257,7 @@ onMounted(load);
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 57%;
+  object-position: center;
   transition: transform 1200ms var(--ease);
 }
 
@@ -442,18 +446,25 @@ onMounted(load);
   width: 38px;
   height: 38px;
   flex: 0 0 38px;
+  overflow: hidden;
   place-items: center;
   border-radius: 50%;
   color: var(--ink);
   background: var(--paper-deep);
   transition:
     color var(--fast) ease,
-    background var(--fast) ease;
+    background var(--fast) ease,
+    transform var(--fast) var(--ease);
+}
+
+.category-link__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .category-link:hover .category-link__icon {
-  color: var(--white);
-  background: var(--persimmon);
+  transform: scale(1.06);
 }
 
 .category-link .icon {
@@ -613,7 +624,8 @@ onMounted(load);
   .hero__image {
     order: 1;
     width: 100%;
-    min-height: 520px;
+    min-height: 0;
+    aspect-ratio: 4 / 3;
   }
 
   .hero__type {
@@ -692,12 +704,14 @@ onMounted(load);
   }
 
   .hero__image {
-    min-height: 440px;
+    /* 竖屏下按图片自身比例收高，避免固定高度留出空白带 */
+    min-height: 0;
+    aspect-ratio: 4 / 3;
     border-radius: 12px;
   }
 
   .hero__image img {
-    object-position: 57% center;
+    object-position: center;
   }
 
   .hero__issue,

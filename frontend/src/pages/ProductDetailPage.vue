@@ -2,7 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { fetchProduct, type Product } from '@/api/product';
+import type { Product } from '@/api/product';
+import { fetchProduct } from '@/features/catalog/source';
 import { BIZ_CODE, isApiError } from '@/api/types';
 import ErrorState from '@/components/ErrorState.vue';
 import PriceText from '@/components/PriceText.vue';

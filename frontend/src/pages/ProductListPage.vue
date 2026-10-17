@@ -2,7 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { PRODUCT_KEYWORD_MAX, PRODUCT_SIZE_MAX, queryProducts, type Product } from '@/api/product';
+import { PRODUCT_KEYWORD_MAX, PRODUCT_SIZE_MAX, type Product } from '@/api/product';
+import { queryProducts } from '@/features/catalog/source';
+import { CATALOG_CATEGORIES } from '@/features/catalog/products';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import Pagination from '@/components/Pagination.vue';
@@ -147,7 +149,7 @@ onBeforeUnmount(() => {
         <div>
           <p class="eyebrow">ALL PRODUCTS</p>
           <h1 class="page-title">全部商品</h1>
-          <p class="page-description">只展示已上架商品，支持关键字与分类 ID 筛选。</p>
+          <p class="page-description">只展示已上架商品，支持关键字与分类筛选。</p>
         </div>
       </div>
 
@@ -165,21 +167,24 @@ onBeforeUnmount(() => {
           />
         </div>
         <div class="field filters__category">
-          <label for="product-category">分类 ID</label>
-          <input
+          <label for="product-category">分类</label>
+          <select
             id="product-category"
-            :value="categoryId ?? ''"
-            class="input"
-            type="number"
-            min="1"
-            placeholder="例如 1001"
+            class="select"
+            :value="categoryId === undefined ? '' : String(categoryId)"
             @change="
               (event) => {
-                const value = Number((event.target as HTMLInputElement).value);
-                categoryId = Number.isInteger(value) && value > 0 ? value : undefined;
+                const raw = (event.target as HTMLSelectElement).value;
+                const value = Number(raw);
+                categoryId = raw && Number.isInteger(value) && value > 0 ? value : undefined;
               }
             "
-          />
+          >
+            <option value="">全部分类</option>
+            <option v-for="item in CATALOG_CATEGORIES" :key="item.id" :value="String(item.id)">
+              {{ item.name }}
+            </option>
+          </select>
         </div>
         <div class="filters__actions">
           <button class="button button--primary button--small" type="submit">筛选</button>
