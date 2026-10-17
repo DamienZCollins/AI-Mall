@@ -26,12 +26,20 @@ interface Crumb {
 const breadcrumb = computed<Crumb[]>(() => {
   const label = route.meta.title ?? '管理端';
   const root: Crumb = { text: '管理端', to: { name: 'admin-home' } };
+  const name = String(route.name ?? '');
 
-  if (route.name === 'admin-home') {
+  if (name === 'admin-home') {
     return [{ text: '管理端' }];
   }
 
-  const name = String(route.name ?? '');
+  // 列表页自身即为该分组，避免出现「商品管理 / 商品管理」这样的重复层级
+  if (name === 'admin-products') {
+    return [root, { text: '商品管理' }];
+  }
+  if (name === 'admin-seckill') {
+    return [root, { text: '秒杀活动' }];
+  }
+
   if (name.startsWith('admin-product')) {
     return [root, { text: '商品管理', to: { name: 'admin-products' } }, { text: label }];
   }
