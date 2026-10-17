@@ -573,6 +573,12 @@
     padding-block: 6px;
   }
 
+  /* 移动端页头只保留品牌、账户与搜索图标，搜索框移入弹层。
+     组件 scoped 样式带 [data-v-*] 属性，选择器需提高特异性才能覆盖 */
+  .header-main > .search-form.search-form {
+    display: none;
+  }
+
   .brand__zh {
     font-size: 21px;
   }
