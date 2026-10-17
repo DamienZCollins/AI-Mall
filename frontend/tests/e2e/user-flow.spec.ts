@@ -9,6 +9,7 @@ import {
   login,
   setProductStatus,
   test,
+  backendUrl,
 } from './fixtures';
 
 /**
@@ -280,7 +281,7 @@ test.describe('鉴权与错误反馈', () => {
 
   test('搜索业务码 3002 有独立文案而不是空结果', async ({ page }) => {
     // 只拦截后端完整地址，避免命中前端 dev 模块 /src/api/search.ts
-    await page.route(/localhost:8080\/api\/search/, async (route) => {
+    await page.route(backendUrl('api/search'), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -294,7 +295,7 @@ test.describe('鉴权与错误反馈', () => {
   });
 
   test('搜索业务码 3001 与 3002 文案不同', async ({ page }) => {
-    await page.route(/localhost:8080\/api\/search/, async (route) => {
+    await page.route(backendUrl('api/search'), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -320,7 +321,7 @@ test.describe('鉴权与错误反馈', () => {
   });
 
   test('后端不可达时展示网络错误而不是空结果', async ({ page }) => {
-    await page.route(/localhost:8080\/api\/products/, async (route) => {
+    await page.route(backendUrl('api/products'), async (route) => {
       await route.abort('failed');
     });
     await page.goto('/products');

@@ -1,12 +1,23 @@
 import { test as base, expect, type Page } from '@playwright/test';
 
-export const API_BASE = process.env.E2E_API_BASE_URL ?? 'http://localhost:8080';
+/**
+ * 后端地址：默认跟随前端 `.env.local` 的 VITE_API_BASE_URL，
+ * 可用 E2E_API_BASE_URL 覆盖（例如本机 8080 被占用时后端临时跑在 8090）。
+ */
+export const API_BASE =
+  process.env.E2E_API_BASE_URL ?? process.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
 export const ADMIN = { username: 'admin', password: 'admin123' };
 export const USER = { username: 'user', password: 'user123' };
 
 /** 拦截后端请求时使用完整域名，避免误命中前端 dev 模块（如 /src/api/search.ts） */
 export const BACKEND_GLOB = `${API_BASE}/api/**`;
+
+/** 按后端地址构造拦截用的正则，端口变化时不用改测试 */
+export function backendUrl(path: string): RegExp {
+  const escaped = API_BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`${escaped}/${path}`);
+}
 
 export async function login(page: Page, account: { username: string; password: string }): Promise<void> {
   await page.goto('/login');
@@ -111,6 +122,76 @@ export async function disableActivity(token: string, activityId: number): Promis
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ status: 0 }),
   });
+}
+
+export interface ActivityWindowOptions {
+  /** 开始时间相对现在的分钟数，负数表示已开始 */
+  startOffsetMinutes: number;
+  /** 结束时间相对现在的分钟数，负数表示已结束 */
+  endOffsetMinutes: number;
+  totalStock?: number;
+}
+
+/** 按指定时间窗口创建活动，用于复现 4002 未开始 / 4003 已结束 */
+export async function createActivityWithWindow(
+  token: string,
+  suffix: string,
+  productId: number,
+  options: ActivityWindowOptions
+): Promise<CreatedActivity> {
+  const title = `E2E 窗口活动 ${suffix}`;
+  const response = await fetch(`${API_BASE}/api/admin/seckill/activities`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      productId,
+      title,
+      seckillPrice: 99.0,
+      totalStock: options.totalStock ?? 5,
+      perUserLimit: 1,
+      startTime: localDateTime(options.startOffsetMinutes),
+      endTime: localDateTime(options.endOffsetMinutes),
+    }),
+  });
+  const body = (await response.json()) as { code: number; data?: { id: number }; message?: string };
+  if (body.code !== 0 || !body.data) {
+    throw new Error(`创建窗口活动失败：${body.code} ${body.message ?? ''}`);
+  }
+  return { id: body.data.id, title, productId };
+}
+
+/** 直接调后端抢购，用于验证业务码而无需经过页面 */
+export async function placeOrderViaApi(
+  userToken: string,
+  activityId: number
+): Promise<{ code: number; message: string }> {
+  const response = await fetch(`${API_BASE}/api/seckill/${activityId}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${userToken}` },
+  });
+  const body = (await response.json()) as { code: number; message: string };
+  return { code: body.code, message: body.message };
+}
+
+/** 普通用户登录令牌 */
+export async function userToken(): Promise<string> {
+  const response = await fetch(`${API_BASE}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(USER),
+  });
+  const body = (await response.json()) as { data?: { token?: string } };
+  const token = body.data?.token;
+  if (!token) throw new Error('普通用户登录失败，无法取得令牌');
+  return token;
+}
+
+/** 查询活动当前详情 */
+export async function getActivityState(activityId: number): Promise<{ remainingStock: number; status: number }> {
+  const response = await fetch(`${API_BASE}/api/seckill/activities/${activityId}`);
+  const body = (await response.json()) as { data?: { remainingStock: number; status: number } };
+  if (!body.data) throw new Error('查询活动详情失败');
+  return body.data;
 }
 
 export const test = base;
