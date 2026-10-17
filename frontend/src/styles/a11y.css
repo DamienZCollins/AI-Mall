@@ -1,0 +1,72 @@
+/* 可访问性基线：焦点环、减少动效、强制颜色。与 base.css 的 .sr-only / .skip-link 配套 */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .reveal,
+  .search-suggestions.is-open,
+  .confirm__panel,
+  .toast {
+    opacity: 1;
+    transform: none;
+  }
+
+  .skeleton {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+
+@media (forced-colors: active) {
+  .button,
+  .icon-button,
+  .round-button,
+  .mobile-nav__item,
+  .action-block .button,
+  .admin-nav__item {
+    border: 1px solid ButtonText;
+  }
+
+  .product-card,
+  .panel,
+  .activity-card,
+  .search-form,
+  .empty-state,
+  .error-state {
+    border-color: CanvasText;
+  }
+
+  .product-tag,
+  .badge,
+  .status-tag,
+  .stock-badge {
+    border: 1px solid CanvasText;
+  }
+
+  /* 状态不只依赖颜色：强制颜色下保留文字与描边 */
+  .badge--success,
+  .badge--danger,
+  .badge--warning,
+  .badge--muted {
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .result__mark,
+  .result__spinner {
+    forced-color-adjust: none;
+    border: 2px solid CanvasText;
+    color: CanvasText;
+    background: Canvas;
+  }
+}

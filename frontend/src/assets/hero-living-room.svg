@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1280" width="1600" height="1280" role="img" aria-label="自然光下的米白客厅，浅色沙发与木质边几围出安静的日常空间">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#f2ece0"/>
+      <stop offset="0.55" stop-color="#e9e0d1"/>
+      <stop offset="1" stop-color="#ded2bd"/>
+    </linearGradient>
+    <linearGradient id="light" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#fffdf8" stop-opacity="0.92"/>
+      <stop offset="0.5" stop-color="#fffaf0" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#fffaf0" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d9c9ae"/>
+      <stop offset="1" stop-color="#c3ad8c"/>
+    </linearGradient>
+    <linearGradient id="sofa" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#f6f1e6"/>
+      <stop offset="1" stop-color="#e2d8c6"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.28" cy="0.12" r="0.75">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="1280" fill="url(#wall)"/>
+  <rect width="1600" height="1280" fill="url(#sun)"/>
+
+  <!-- 拱形窗与漫射光 -->
+  <g opacity="0.9">
+    <path d="M1180 760V336c0-96 78-174 174-174s174 78 174 174v424z" fill="#efe7d8"/>
+    <path d="M1206 758V340c0-82 66-148 148-148s148 66 148 148v418z" fill="#fdf9ef"/>
+    <path d="M1354 192v566M1206 500h296" stroke="#d8cbb2" stroke-width="7" fill="none"/>
+  </g>
+  <path d="M1206 758 700 1280h660L1354 758z" fill="url(#light)"/>
+
+  <!-- 地板 -->
+  <rect y="856" width="1600" height="424" fill="url(#floor)"/>
+  <g stroke="#b39872" stroke-opacity="0.32" stroke-width="3">
+    <path d="M0 916h1600M0 994h1600M0 1078h1600M0 1168h1600"/>
+    <path d="M260 856v424M620 856v424M980 856v424M1340 856v424" stroke-opacity="0.16"/>
+  </g>
+
+  <!-- 地毯 -->
+  <ellipse cx="700" cy="1116" rx="500" ry="132" fill="#e6dbc7" opacity="0.86"/>
+  <ellipse cx="700" cy="1116" rx="374" ry="96" fill="none" stroke="#c9b89a" stroke-width="4" opacity="0.7"/>
+
+  <!-- 沙发 -->
+  <g>
+    <rect x="212" y="700" width="700" height="248" rx="30" fill="url(#sofa)"/>
+    <rect x="248" y="662" width="300" height="120" rx="26" fill="#f4eee1"/>
+    <rect x="566" y="662" width="300" height="120" rx="26" fill="#f4eee1"/>
+    <rect x="212" y="880" width="700" height="76" rx="22" fill="#ded3bf"/>
+    <rect x="196" y="738" width="56" height="196" rx="24" fill="#e8dfcd"/>
+    <rect x="872" y="738" width="56" height="196" rx="24" fill="#e8dfcd"/>
+    <rect x="256" y="948" width="34" height="54" rx="10" fill="#a98c62"/>
+    <rect x="836" y="948" width="34" height="54" rx="10" fill="#a98c62"/>
+    <!-- 抱枕 -->
+    <rect x="304" y="716" width="118" height="112" rx="22" fill="#cdc3ac" transform="rotate(-7 363 772)"/>
+    <rect x="686" y="722" width="112" height="106" rx="20" fill="#bd4328" opacity="0.78" transform="rotate(6 742 775)"/>
+    <!-- 毯子 -->
+    <path d="M792 772h96c18 0 30 12 30 30v112c0 12-10 20-22 20h-104z" fill="#e6ddc9" opacity="0.9"/>
+  </g>
+
+  <!-- 木质边几与花瓶 -->
+  <g>
+    <rect x="1010" y="820" width="286" height="20" rx="10" fill="#a9835a"/>
+    <rect x="1030" y="840" width="14" height="128" rx="6" fill="#9c7850"/>
+    <rect x="1262" y="840" width="14" height="128" rx="6" fill="#9c7850"/>
+    <rect x="1112" y="756" width="62" height="66" rx="12" fill="#e9e0cd"/>
+    <path d="M1143 756c-6-40 10-70 26-88" stroke="#7f8a75" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M1136 758c-14-30-4-58 8-74" stroke="#7f8a75" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <circle cx="1166" cy="662" r="17" fill="#bd4328" opacity="0.75"/>
+    <circle cx="1141" cy="682" r="13" fill="#bd4328" opacity="0.6"/>
+    <rect x="1046" y="792" width="66" height="30" rx="5" fill="#8b6a46"/>
+    <rect x="1052" y="786" width="54" height="8" rx="4" fill="#c9b391"/>
+  </g>
+
+  <!-- 落地灯 -->
+  <g>
+    <path d="M356 656c0-42 30-72 66-72s66 30 66 72z" fill="#efe7d6"/>
+    <rect x="418" y="656" width="8" height="292" fill="#a98c62"/>
+    <ellipse cx="422" cy="950" rx="54" ry="12" fill="#a98c62"/>
+  </g>
+
+  <!-- 墙面装饰画 -->
+  <g>
+    <rect x="640" y="300" width="252" height="316" rx="8" fill="#faf5ea" stroke="#cbbda2" stroke-width="5"/>
+    <rect x="666" y="330" width="200" height="256" fill="#e8dfcc"/>
+    <path d="M690 526c44-58 74-92 96-96s48 26 76 62" stroke="#a98c62" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <circle cx="790" cy="390" r="30" fill="#bd4328" opacity="0.5"/>
+  </g>
+
+  <!-- 前景柔光 -->
+  <rect width="1600" height="1280" fill="#fffdf8" opacity="0.06"/>
+</svg>

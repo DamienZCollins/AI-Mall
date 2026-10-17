@@ -1,0 +1,57 @@
+/* 设计令牌：与 frontend/原型.html 第 14–42 行逐字一致，变量名不改写 */
+:root {
+  --paper: #f4efe4;
+  --paper-light: #fbf8f0;
+  --paper-deep: #ebe3d3;
+  --ink: #1d1b17;
+  --ink-soft: #625c52;
+  --ink-muted: #8a8174;
+  --line: rgba(29, 27, 23, 0.16);
+  --line-strong: rgba(29, 27, 23, 0.32);
+  --persimmon: #bd4328;
+  --persimmon-dark: #96351f;
+  --sage: #7f8a75;
+  --white: #fffdf8;
+  --black: #14120f;
+
+  --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-latin: "Instrument Sans", "Noto Sans SC", sans-serif;
+
+  --container: 1440px;
+  --gutter: 64px;
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 16px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --fast: 180ms;
+  --normal: 360ms;
+  --slow: 720ms;
+  --header-h: 78px;
+
+  /* 语义色：状态必须在文字上可辨，不只依赖颜色 */
+  --state-success: var(--sage);
+  --state-danger: var(--persimmon);
+  --state-neutral: var(--ink-muted);
+  --state-warning: #a8791f;
+}
+
+/* 断点取值统一在此维护：1280 / 1100 / 860 / 600 / 370 */
+@media (max-width: 1280px) {
+  :root {
+    --gutter: 40px;
+  }
+}
+
+@media (max-width: 860px) {
+  :root {
+    --gutter: 28px;
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --gutter: 20px;
+    --radius-l: 14px;
+    --header-h: 64px;
+  }
+}
