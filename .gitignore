@@ -61,6 +61,13 @@ desktop.ini
 # 本地启动状态
 /backend/.last-start-process
 
+# 前端测试与本地环境
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/blob-report/
+/frontend/.env.local
+/frontend/.env.*.local
+
 # 并发验证用测试数据
 /backend/sql/data-seckill-test.sql
 /backend/sql/data-seckill-load.sql
