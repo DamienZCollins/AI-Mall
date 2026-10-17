@@ -1,5 +1,5 @@
 -- 阶段 2 表结构
--- 执行方式：mysql -h localhost -u dev -p mall < sql/schema.sql
+-- 执行方式：cd backend; mysql -h localhost -u dev -p mall < sql/schema.sql
 
 CREATE TABLE IF NOT EXISTS `sys_user`
 (

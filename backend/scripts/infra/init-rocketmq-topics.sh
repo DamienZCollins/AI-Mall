@@ -6,7 +6,7 @@
 # 普通消息与延迟消息不能放同一主题（MIXED 类型 broker 不支持），故拆成两个。
 # 主题只创建一次即可，updateTopic 是幂等的。
 #
-# 用法：sh scripts/init-rocketmq-topics.sh
+# 用法：cd backend; sh scripts/infra/init-rocketmq-topics.sh
 
 set -e
 

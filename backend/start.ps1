@@ -2,7 +2,7 @@
 一键启动本地开发环境。
 
 用法：
-  powershell -ExecutionPolicy Bypass -File scripts/start.ps1
+  powershell -ExecutionPolicy Bypass -File backend/start.ps1
 
 参数：
   -ResetDb        重建数据库（删除并重灌 mall 表）
@@ -15,7 +15,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $PSScriptRoot
+$root = $PSScriptRoot
 Set-Location $root
 
 function Info($message) { Write-Host "==> $message" -ForegroundColor Cyan }
@@ -40,6 +40,16 @@ function Invoke-Mysql($container, $password, $database, $sql) {
     return $LASTEXITCODE
 }
 
+function Wait-ProxyHealthy($timeoutSeconds) {
+    $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $state = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' mall-rocketmq-proxy 2>$null
+        if ($state -eq 'healthy') { return $true }
+        Start-Sleep -Seconds 2
+    }
+    return $false
+}
+
 Assert-Command docker '请先安装并启动 Docker Desktop。'
 Assert-Command mvn '请先安装 Maven 并加入 PATH。'
 Assert-Command java '请先安装 Java 21 并加入 PATH。'
@@ -60,7 +70,7 @@ if ($embeddingApiKey -eq 'change-me') {
 }
 
 Info '构建应用'
-mvn -q -DskipTests package
+mvn -q -f "$root/pom.xml" -DskipTests package
 if ($LASTEXITCODE -ne 0) { Fail 'Maven 构建失败' }
 
 Info '启动中间件（首次会构建 ES 镜像，耗时较长）'
@@ -85,8 +95,18 @@ if (-not $dockerRunning) {
     if (-not $dockerReady) { Fail 'Docker Desktop 启动超时，请手动检查 Docker Desktop 状态。' }
 }
 
-docker compose up -d --build --wait
+# 代理可能早于 broker 可响应管理请求而退出，先拉起可用服务，再单独恢复代理。
+docker compose up -d --build
 if ($LASTEXITCODE -ne 0) { Fail '中间件启动失败' }
+
+$proxyReady = Wait-ProxyHealthy 20
+if (-not $proxyReady) {
+    Info 'RocketMQ 代理未就绪，重启代理'
+    docker compose restart rocketmq-proxy | Out-Null
+    if ($LASTEXITCODE -ne 0) { Fail '重启 RocketMQ 代理失败' }
+    $proxyReady = Wait-ProxyHealthy 60
+}
+if (-not $proxyReady) { Fail 'RocketMQ 代理未恢复健康' }
 
 Info '初始化数据库'
 if ($ResetDb) {
@@ -106,10 +126,14 @@ foreach ($topic in @(@('mall-seckill-order', 'NORMAL'), @('mall-seckill-timeout'
     if ($LASTEXITCODE -ne 0) { Fail "RocketMQ 主题初始化失败：$($topic[0])" }
 }
 
-docker compose restart rocketmq-proxy | Out-Null
-if ($LASTEXITCODE -ne 0) { Fail '重启 RocketMQ 代理失败' }
-docker compose up --wait rocketmq-proxy
-if ($LASTEXITCODE -ne 0) { Fail 'RocketMQ 代理未恢复健康' }
+$proxyReady = Wait-ProxyHealthy 20
+if (-not $proxyReady) {
+    Info '主题变更后重启 RocketMQ 代理'
+    docker compose restart rocketmq-proxy | Out-Null
+    if ($LASTEXITCODE -ne 0) { Fail '重启 RocketMQ 代理失败' }
+    $proxyReady = Wait-ProxyHealthy 60
+}
+if (-not $proxyReady) { Fail 'RocketMQ 代理未恢复健康' }
 
 Info '导入环境变量'
 foreach ($line in Get-Content .env) {
@@ -124,7 +148,7 @@ if ($NoApp) {
 else {
     $java = (Get-Command java).Source
     $appProcess = Start-Process -FilePath $java `
-        -ArgumentList @('-jar', 'target/mall-0.0.1-SNAPSHOT.jar') `
+        -ArgumentList @('-jar', (Join-Path $root 'target/mall-0.0.1-SNAPSHOT.jar')) `
         -WorkingDirectory $root -WindowStyle Hidden -PassThru
 
     $healthUrl = 'http://localhost:8080/actuator/health'

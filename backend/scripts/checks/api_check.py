@@ -1,6 +1,6 @@
 """阶段 2 接口验收脚本：覆盖登录、角色鉴权、商品维护与图片上传。
 
-用法：python scripts/api_check.py
+用法：cd backend; python scripts/checks/api_check.py
 前提：应用已在 localhost:8080 启动，sql/schema.sql 与 sql/data.sql 已执行。
 说明：用 Python 发起请求是为了避免 Windows 终端 GBK 编码破坏中文请求体。
 """
@@ -8,8 +8,13 @@
 import json
 import subprocess
 import sys
+from pathlib import Path
+
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 BASE = "http://localhost:8080"
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def request(path, method="GET", payload=None, token=None, form=None):
@@ -129,7 +134,7 @@ def main():
 
     code, body = request("/api/admin/products/images", "POST",
                          token=admin_token,
-                         form=["-F", "file=@src/test/resources/sample.png;type=image/png"])
+                         form=["-F", f"file=@{ROOT / 'src/test/resources/sample.png'};type=image/png"])
     results.append(show("23 上传商品图片", code, body, 200))
     if '"code":0' in body:
         url = json.loads(body)["data"]
@@ -140,12 +145,12 @@ def main():
 
     code, body = request("/api/admin/products/images", "POST",
                          token=admin_token,
-                         form=["-F", "file=@pom.xml;type=image/png"])
+                         form=["-F", f"file=@{ROOT / 'pom.xml'};type=image/png"])
     results.append(show("24 非图片文件被拒绝", code, body, 200))
     results.append(check("24b 返回上传失败 2003", '"code":2003' in body))
 
     code, body = request("/api/admin/products/images", "POST", token=user_token,
-                         form=["-F", "file=@src/test/resources/sample.png;type=image/png"])
+                         form=["-F", f"file=@{ROOT / 'src/test/resources/sample.png'};type=image/png"])
     results.append(show("25 USER 角色上传图片", code, body, 403))
 
     passed = sum(1 for r in results if r is True)

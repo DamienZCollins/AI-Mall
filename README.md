@@ -7,18 +7,22 @@
 
 ## 快速开始
 
+后端位于 `backend/`，以下命令均在该目录执行：
+
 ```bash
+cd backend
+
 # 1. 准备环境变量
 copy .env.example .env
 
 # 2. 一键启动：构建应用、启动中间件、建表、初始化 RocketMQ 主题并启动应用
-powershell -ExecutionPolicy Bypass -File scripts/start.ps1
+powershell -ExecutionPolicy Bypass -File start.ps1
 
 # 可选：只启动中间件
-powershell -ExecutionPolicy Bypass -File scripts/start.ps1 -NoApp
+powershell -ExecutionPolicy Bypass -File start.ps1 -NoApp
 
 # 可选：删除并重建 mall 数据库后启动
-powershell -ExecutionPolicy Bypass -File scripts/start.ps1 -ResetDb
+powershell -ExecutionPolicy Bypass -File start.ps1 -ResetDb
 ```
 
 初始账号：`admin / admin123`（管理员）、`user / user123`（普通用户）。
@@ -66,7 +70,7 @@ Redis 与数据库两侧都会扣减与回补，数据库约束作为最后一�
 检索时同时发起 BM25 关键词召回与 kNN 语义召回，两路结果按 RRF（`Σ 1/(k+rank)`，k=60）融合。
 品牌型号这类精确查询靠 BM25 稳定命中，自然语言描述靠 kNN 召回语义相关商品。
 
-Elasticsearch 使用自建镜像 `docker/elasticsearch/Dockerfile`，额外安装了 analysis-ik 分词插件，
+Elasticsearch 使用自建镜像 `backend/docker/elasticsearch/Dockerfile`，额外安装了 analysis-ik 分词插件，
 否则中文会被切成单字。首次使用需先 `docker compose build elasticsearch`。
 
 
@@ -86,34 +90,44 @@ Elasticsearch 使用自建镜像 `docker/elasticsearch/Dockerfile`，额外安�
 
 ```text
 .
-├── docker/                     # RocketMQ broker 配置、含 ik 分词的 ES 镜像
-├── docker-compose.yml          # 本地中间件编排
-├── scripts/                    # 本机验证脚本，不进入版本库
-├── sql/                        # 建表与初始化数据脚本
-└── .env.example                # 环境变量模板
+├── backend/                    # 后端开发入口（Spring Boot 与运行依赖）
+│   ├── src/
+│   ├── pom.xml
+│   ├── docker/                 # RocketMQ 配置、含 ik 分词的 ES 镜像
+│   ├── docker-compose.yml      # 本地中间件编排
+│   ├── scripts/                # 接口验收与 JMeter 压测脚本
+│   ├── sql/                    # 建表与初始化数据
+│   ├── result/                 # 压测产物
+│   ├── .env.example
+│   └── start.ps1
+├── frontend/                   # 前端开发目录，当前为空
+├── docs/                       # 项目公共文档
+├── README.md
+└── AGENTS.md
 ```
+
+`backend/` 与 `frontend/` 是相互独立的开发入口。后端源码不跨目录引用前端，前端通过 HTTP 接口访问后端。
 
 ## 验证脚本
 
-`scripts/` 下的脚本用于本机验收，各阶段的实测结果记录在 `docs/拆分任务/` 下。
-脚本不进入版本库，需要时本地保留即可：
+`backend/scripts/checks/` 下的脚本用于本机验收，各阶段的实测结果记录在 `docs/拆分任务/` 下：
 
 | 脚本 | 说明 |
 | --- | --- |
-| `api_check.py` | 认证、权限、商品维护、图片上传 |
-| `search_check.py` | 对比 RRF 融合、BM25、kNN 三路检索结果 |
-| `sync_check.py` | 商品变更到 Elasticsearch 索引的同步链路 |
-| `seckill_check.py` | 秒杀防超卖、防重复下单、状态机、超时回补（含并发） |
-| `seckill_async_check.py` | Redis 预扣、MQ 异步下单、延迟消息关单、MQ 降级 |
+| `backend/scripts/checks/api_check.py` | 认证、权限、商品维护、图片上传 |
+| `backend/scripts/checks/search_check.py` | 对比 RRF 融合、BM25、kNN 三路检索结果 |
+| `backend/scripts/checks/sync_check.py` | 商品变更到 Elasticsearch 索引的同步链路 |
+| `backend/scripts/checks/seckill_check.py` | 秒杀防超卖、防重复下单、状态机、超时回补（含并发） |
+| `backend/scripts/checks/seckill_async_check.py` | Redis 预扣、MQ 异步下单、延迟消息关单、MQ 降级 |
 
-`seckill_check.py` 与 `seckill_async_check.py` 需要并发账号，先执行 `sql/data-seckill-test.sql` 写入测试用户。
+`seckill_check.py` 与 `seckill_async_check.py` 需要并发账号，先执行 `backend/sql/data-seckill-test.sql` 写入测试用户。
 
 ## RocketMQ 主题
 
 首次使用需建主题：
 
 ```bash
-sh scripts/init-rocketmq-topics.sh
+sh backend/scripts/infra/init-rocketmq-topics.sh
 docker compose restart rocketmq-proxy
 ```
 

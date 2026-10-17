@@ -1,11 +1,13 @@
 # 本地文档与代理说明（不进入版本库）
 /docs/
+/backend/docs/
+/frontend/docs/
 /AGENTS.md
 
 # 环境变量
-.env
-.env.local
-.env.*.local
+/backend/.env
+/backend/.env.local
+/backend/.env.*.local
 
 # Java 构建产物
 target/
@@ -15,6 +17,12 @@ out/
 *.jar
 *.war
 !.mvn/wrapper/maven-wrapper.jar
+
+# 前端构建产物与依赖
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
 
 # 日志
 logs/
@@ -43,17 +51,20 @@ desktop.ini
 *.tmp
 *.bak
 
-# 本地验证脚本（保留在本地，不进入版本库）
-# 目录级忽略会屏蔽后面的取反规则，必须先放开目录内容再排除
-/scripts/*
-!/scripts/api_check.py
-!/scripts/init-rocketmq-topics.sh
-!/scripts/start.ps1
+# 本地验证脚本按分类存放
+/backend/scripts/checks/*
+!/backend/scripts/checks/api_check.py
+/backend/scripts/infra/*
+!/backend/scripts/infra/init-rocketmq-topics.sh
+/backend/scripts/loadtest/
+
+# 本地启动状态
+/backend/.last-start-process
 
 # 并发验证用测试数据
-/sql/data-seckill-test.sql
-/sql/data-seckill-load.sql
+/backend/sql/data-seckill-test.sql
+/backend/sql/data-seckill-load.sql
 
 # 压测产物（原始结果与令牌只保留在本地）
-/scripts/jmeter/
-result/
+/backend/scripts/jmeter/
+/backend/result/

@@ -1,5 +1,5 @@
 -- 阶段 2、3 初始数据
--- 执行方式：mysql -h localhost -u dev -p mall < sql/data.sql
+-- 执行方式：cd backend; mysql -h localhost -u dev -p mall < sql/data.sql
 -- 账号密码：admin / admin123，user / user123（均为 BCrypt 密文）
 -- 可重复执行：商品先清空再写入，保证索引重建的输入稳定
 
