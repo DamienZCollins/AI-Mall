@@ -24,6 +24,19 @@ export const CATALOG_MODE: CatalogMode =
 
 export const IS_LOCAL_CATALOG = CATALOG_MODE === 'local';
 
+/**
+ * 启动时在控制台标注当前数据源。
+ * 进程环境变量优先于 .env.local，容易在调试后残留成 backend，
+ * 导致页面全部显示占位图；这行日志用于快速判断是不是数据源不对。
+ */
+if (import.meta.env.DEV) {
+  const hint =
+    CATALOG_MODE === 'local'
+      ? '本地素材目录（public/images/products）'
+      : '后端接口 GET /api/products（商品图依赖 imageUrl）';
+  console.warn(`[catalog] 商品数据源：${hint}`);
+}
+
 /** 本地目录只做展示，不参与下单与秒杀 */
 export function categoryNameOf(categoryId: number): string {
   return CATALOG_CATEGORIES.find((item) => item.id === categoryId)?.name ?? `分类 ${categoryId}`;
