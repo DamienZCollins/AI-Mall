@@ -1,6 +1,5 @@
 package com.mall.seckill.mq;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mall.seckill.entity.SeckillActivity;
@@ -13,9 +12,11 @@ import org.apache.rocketmq.client.apis.consumer.FilterExpression;
 import org.apache.rocketmq.client.apis.consumer.PushConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.Map;
 
 /**
@@ -26,6 +27,9 @@ public class OrderCreateConsumer implements SeckillMessageConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(OrderCreateConsumer.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    /** MySQL 唯一键冲突错误码 */
+    private static final int MYSQL_DUPLICATE_ENTRY = 1062;
 
     private final ClientServiceProvider provider;
     private final RocketMqProperties properties;
@@ -55,7 +59,7 @@ public class OrderCreateConsumer implements SeckillMessageConsumer {
     }
 
     /**
-     * 订单已存在或唯一索引冲突都视为处理成功，避免重复投递时反复重试
+     * 唯一键冲突视为重复消息，其它异常交给 MQ 重投
      */
     @Override
     public ConsumeResult consume(String body) {
@@ -69,11 +73,13 @@ public class OrderCreateConsumer implements SeckillMessageConsumer {
             sendTimeoutMessage(order);
             return ConsumeResult.SUCCESS;
         } catch (Exception e) {
-            if (isDuplicate(message)) {
-                log.info("订单已存在，幂等返回 orderNo={}", message.orderNo());
+            if (isDuplicateKey(e)) {
+                log.info("订单已存在，幂等返回 orderNo={} activityId={}",
+                        message.orderNo(), message.activityId());
                 return ConsumeResult.SUCCESS;
             }
-            log.error("创建订单失败 orderNo={}", message.orderNo(), e);
+            log.error("创建订单失败，消息将重投 orderNo={} activityId={}",
+                    message.orderNo(), message.activityId(), e);
             return ConsumeResult.FAILURE;
         }
     }
@@ -90,13 +96,33 @@ public class OrderCreateConsumer implements SeckillMessageConsumer {
             log.info("已投递延迟关单消息 orderNo={} 延迟 {} 分钟",
                     order.getOrderNo(), activity.getPayTimeoutMinutes());
         } catch (Exception e) {
-            log.error("投递延迟关单消息失败，改由定时任务兜底 orderNo={}", order.getOrderNo(), e);
+            log.error("延迟关单消息投递失败，该订单将由超时定时任务兜底 orderNo={} activityId={}",
+                    order.getOrderNo(), order.getActivityId(), e);
         }
     }
 
-    private boolean isDuplicate(SeckillOrderMessage message) {
-        Long count = orderService.countByUserAndActivity(message.userId(), message.activityId());
-        return count > 0;
+    /**
+     * 只有唯一键冲突（uk_user_activity / uk_order_no）才是重复消息
+     *
+     * <p>数据库库存扣减失败等异常不是重复，必须按失败重投，否则预扣的库存永远不会落库
+     */
+    private boolean isDuplicateKey(Throwable e) {
+        Throwable cause = e;
+        while (cause != null) {
+            if (cause instanceof DuplicateKeyException) {
+                return true;
+            }
+            // 未经 Spring 异常转换时按 MySQL 唯一键冲突错误码识别，避免把其它完整性约束违例当成重复
+            if (cause instanceof SQLIntegrityConstraintViolationException sql
+                    && sql.getErrorCode() == MYSQL_DUPLICATE_ENTRY) {
+                return true;
+            }
+            if (cause.getCause() == cause) {
+                break;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private SeckillOrderMessage parse(String body) {

@@ -6,7 +6,8 @@ import org.springframework.stereotype.Component;
 /**
  * 待支付订单超时取消
  *
- * <p>阶段 5 会改用 RocketMQ 延迟消息做精确触发，这个定时任务作为兜底保留
+ * <p>精确触发由订单创建后投递的 RocketMQ 延迟消息完成，本定时任务按 60 秒周期补偿：
+ * 延迟消息投递失败、消费者重启丢消息、订单创建时消息未被投递等场景下仍能关单并回补库存
  */
 @Component
 public class SeckillOrderTimeoutTask {
