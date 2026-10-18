@@ -14,7 +14,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 BASE = "http://localhost:8080"
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def request(path, method="GET", payload=None, token=None, form=None):
@@ -44,6 +44,17 @@ def check(label, condition, detail=""):
     mark = "PASS" if condition else "FAIL"
     print(f"[{mark}] {label}" + (f" -> {detail}" if detail else ""))
     return bool(condition)
+
+
+def cleanup_products(*product_ids):
+    """删除本次创建的商品，避免验收数据留在种子库里"""
+    ids = ",".join(str(i) for i in product_ids if i)
+    if not ids:
+        return
+    subprocess.run(["docker", "exec", "mall-mysql", "mysql", "-uroot", "-p1234",
+                    "-e", f"USE mall; DELETE FROM product WHERE id IN ({ids});"],
+                   capture_output=True)
+    print(f"       已清理验收商品 id={ids}")
 
 
 def main():
@@ -77,7 +88,17 @@ def main():
     print(f"       列表: {names}")
     results.append(check("8 下架商品不在列表中", all(p["status"] == 1 for p in listed)))
 
-    code, body = request("/api/products/4", token=user_token)
+    # 种子数据全部上架，下架商品的用例改用临时创建的商品，不依赖固定 ID
+    code, body = request("/api/admin/products", "POST",
+                         {"name": "下架验证商品", "brand": "沃兰", "categoryId": 1001,
+                          "description": "用于验证下架商品对用户不可见。",
+                          "sellingPoint": "下架验证", "price": 199.00, "stock": 10},
+                         token=admin_token)
+    off_id = json.loads(body)["data"]["id"]
+    request(f"/api/admin/products/{off_id}/status", "PATCH", {"status": 1}, token=admin_token)
+    request(f"/api/admin/products/{off_id}/status", "PATCH", {"status": 0}, token=admin_token)
+
+    code, body = request(f"/api/products/{off_id}", token=user_token)
     results.append(show("9 下架商品详情", code, body, 200))
     results.append(check("9b 下架商品返回 2001", '"code":2001' in body))
 
@@ -152,6 +173,8 @@ def main():
     code, body = request("/api/admin/products/images", "POST", token=user_token,
                          form=["-F", f"file=@{ROOT / 'src/test/resources/sample.png'};type=image/png"])
     results.append(show("25 USER 角色上传图片", code, body, 403))
+
+    cleanup_products(off_id, new_id)
 
     passed = sum(1 for r in results if r is True)
     print(f"\n通过 {passed} / {len(results)} 项")
