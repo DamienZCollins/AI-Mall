@@ -26,9 +26,9 @@ function backHome(): void {
     <div class="container">
       <div class="page-head">
         <div>
-          <p class="eyebrow">AI HYBRID SEARCH</p>
+          <p class="eyebrow">SEARCH</p>
           <h1 class="page-title">搜索结果</h1>
-          <p class="page-description">BM25 关键词召回与向量语义召回融合排序，支持自然语言描述。</p>
+          <p class="page-description">输入商品名称、品牌或一句日常描述，找到合适的商品。</p>
         </div>
       </div>
 

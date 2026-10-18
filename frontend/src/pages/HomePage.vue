@@ -1,29 +1,55 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 import type { Product } from '@/api/product';
+import { listActivities, type SeckillActivity } from '@/api/seckill';
 import { queryProducts } from '@/features/catalog/source';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import ProductCard from '@/components/ProductCard.vue';
 import SkeletonBlock from '@/components/SkeletonBlock.vue';
-import SearchInput from '@/components/SearchInput.vue';
 import type { ApiError } from '@/api/types';
 import { isApiError } from '@/api/types';
+import SeckillActivityCard from '@/features/seckill/SeckillActivityCard.vue';
 import { handleImageError } from '@/utils/image';
 
+const activities = ref<SeckillActivity[]>([]);
 const weekly = ref<Product[]>([]);
 const popular = ref<Product[]>([]);
 const loading = ref(true);
 const error = ref<ApiError | Error | null>(null);
+const activityLoading = ref(true);
+const activityError = ref<ApiError | Error | null>(null);
+
+let activityController: AbortController | null = null;
 
 const categories = [
-  { label: '数码', to: '/products?categoryId=1001', img: '01_头戴式耳机_黑色黄底.jpg' },
-  { label: '家居', to: '/products?categoryId=1002', img: '10_墨绿绒面双人沙发.jpg' },
+  {
+    label: '数码',
+    to: '/products?categoryId=1001',
+    img: '01_头戴式耳机_黑色黄底.jpg',
+  },
+  {
+    label: '家居',
+    to: '/products?categoryId=1002',
+    img: '10_墨绿绒面双人沙发.jpg',
+  },
   { label: '个护', to: '/products?categoryId=1003', img: '17_香氛蜡烛.jpg' },
-  { label: '服饰箱包', to: '/products?categoryId=1004', img: '26_深蓝通勤双肩包.jpg' },
-  { label: '食品饮品', to: '/products?categoryId=1005', img: '28_烘焙咖啡豆.jpg' },
-  { label: '生活方式', to: '/products?categoryId=1006', img: '40_桌面多肉盆栽.jpg' },
+  {
+    label: '服饰箱包',
+    to: '/products?categoryId=1004',
+    img: '26_深蓝通勤双肩包.jpg',
+  },
+  {
+    label: '食品饮品',
+    to: '/products?categoryId=1005',
+    img: '28_烘焙咖啡豆.jpg',
+  },
+  {
+    label: '生活方式',
+    to: '/products?categoryId=1006',
+    img: '40_桌面多肉盆栽.jpg',
+  },
 ];
 
 async function load(): Promise<void> {
@@ -42,7 +68,29 @@ async function load(): Promise<void> {
   }
 }
 
-onMounted(load);
+async function loadActivities(): Promise<void> {
+  activityController?.abort();
+  activityController = new AbortController();
+  activityLoading.value = true;
+  activityError.value = null;
+
+  try {
+    const result = await listActivities({ page: 1, size: 3 }, activityController.signal);
+    activities.value = result.list;
+  } catch (caught) {
+    if (isApiError(caught) && caught.kind === 'canceled') return;
+    activityError.value = caught as Error;
+  } finally {
+    activityLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  void load();
+  void loadActivities();
+});
+
+onBeforeUnmount(() => activityController?.abort());
 </script>
 
 <template>
@@ -77,7 +125,9 @@ onMounted(load);
                   <path d="M5 12h14M13 6l6 6-6 6" />
                 </svg>
               </RouterLink>
-              <RouterLink class="button button--outline" :to="{ name: 'seckill-list' }">查看秒杀活动</RouterLink>
+              <RouterLink class="button button--outline" :to="{ name: 'home', hash: '#seckill' }"
+                >查看秒杀活动</RouterLink
+              >
             </div>
           </div>
 
@@ -97,12 +147,7 @@ onMounted(load);
     <section class="category-section" aria-label="分类快捷入口">
       <div class="container">
         <nav class="category-rail" aria-label="商品分类">
-          <RouterLink
-            v-for="item in categories"
-            :key="item.label"
-            class="category-link"
-            :to="item.to"
-          >
+          <RouterLink v-for="item in categories" :key="item.label" class="category-link" :to="item.to">
             <span class="category-link__icon">
               <img
                 :src="`/images/products/${encodeURIComponent(item.img)}`"
@@ -116,6 +161,53 @@ onMounted(load);
             <span>{{ item.label }}</span>
           </RouterLink>
         </nav>
+      </div>
+    </section>
+
+    <section id="seckill" class="section seckill" aria-labelledby="seckill-title">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-head__copy">
+            <p class="eyebrow">FLASH SALE</p>
+            <h2 id="seckill-title" class="section-title">秒杀活动</h2>
+            <p class="section-description">限时价格与实时库存来自秒杀活动接口，先到先得。</p>
+          </div>
+          <RouterLink class="text-link" :to="{ name: 'seckill-list' }">
+            查看全部
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </RouterLink>
+        </div>
+
+        <div v-if="activityLoading" class="grid grid--3">
+          <div v-for="index in 3" :key="index" class="activity-skeleton">
+            <SkeletonBlock width="24%" height="14px" />
+            <SkeletonBlock height="20px" />
+            <SkeletonBlock width="42%" height="18px" />
+            <SkeletonBlock height="64px" />
+            <SkeletonBlock height="38px" />
+          </div>
+        </div>
+
+        <ErrorState
+          v-else-if="activityError"
+          :error="activityError"
+          title="秒杀活动加载失败"
+          @retry="loadActivities"
+        />
+
+        <EmptyState
+          v-else-if="activities.length === 0"
+          title="暂无秒杀活动"
+          description="活动创建后会显示在这里。"
+          action-text="刷新"
+          @action="loadActivities"
+        />
+
+        <div v-else class="grid grid--3">
+          <SeckillActivityCard v-for="activity in activities" :key="activity.id" :activity="activity" />
+        </div>
       </div>
     </section>
 
@@ -195,23 +287,6 @@ onMounted(load);
 
         <div v-else class="grid grid--4">
           <ProductCard v-for="product in popular" :key="product.id" :product="product" />
-        </div>
-      </div>
-    </section>
-
-    <section id="search-entry" class="search-entry" aria-labelledby="search-entry-title">
-      <div class="container">
-        <div class="search-entry__panel">
-          <div>
-            <p class="eyebrow">AI HYBRID SEARCH</p>
-            <h2 id="search-entry-title" class="search-entry__title">用一句话，找到那件东西</h2>
-            <p class="search-entry__description">
-              关键词召回与语义向量召回融合排序，试试「夏天穿的透气鞋」这类自然语言描述。
-            </p>
-          </div>
-          <div class="search-entry__form">
-            <SearchInput input-id="home-search" placeholder="描述你想找的东西" />
-          </div>
         </div>
       </div>
     </section>
@@ -520,6 +595,20 @@ onMounted(load);
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.activity-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: rgba(251, 248, 240, 0.58);
+}
+
 .card-skeleton {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -532,42 +621,6 @@ onMounted(load);
   flex-direction: column;
   gap: 10px;
   padding: 17px;
-}
-
-/* ---------- Search entry ---------- */
-.search-entry {
-  padding-bottom: 96px;
-}
-
-.search-entry__panel {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  align-items: center;
-  gap: 40px;
-  padding: 36px 40px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-l);
-  background: var(--paper-light);
-}
-
-.search-entry__title {
-  margin-top: 10px;
-  font-size: clamp(24px, 2.6vw, 34px);
-  font-weight: 800;
-  letter-spacing: -0.055em;
-}
-
-.search-entry__description {
-  max-width: 460px;
-  margin-top: 10px;
-  color: var(--ink-soft);
-  font-size: 13px;
-  line-height: 1.8;
-}
-
-.search-entry__form :deep(.search-form) {
-  max-width: none;
-  margin-left: 0;
 }
 
 @media (max-width: 1280px) {
@@ -604,9 +657,8 @@ onMounted(load);
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .search-entry__panel {
-    grid-template-columns: 1fr;
-    gap: 24px;
+  .grid--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -689,8 +741,8 @@ onMounted(load);
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .search-entry__panel {
-    padding: 28px 24px;
+  .grid--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -811,12 +863,12 @@ onMounted(load);
     gap: 10px;
   }
 
-  .search-entry {
-    padding-bottom: 56px;
+  .grid--3 {
+    grid-template-columns: 1fr;
   }
 
-  .search-entry__panel {
-    padding: 22px 18px;
+  .activity-skeleton {
+    padding: 14px;
   }
 }
 

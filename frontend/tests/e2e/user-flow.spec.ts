@@ -41,7 +41,7 @@ test.describe('用户侧关键路径', () => {
     await expect(page.getByText('商品描述')).toBeVisible();
   });
 
-  test('AI 搜索展示真实召回结果，前进后退可恢复条件', async ({ page }) => {
+  test('搜索展示真实召回结果，前进后退可恢复条件', async ({ page }) => {
     await page.goto('/search?keyword=%E8%B7%91%E9%9E%8B');
     await expect(page.getByRole('heading', { name: '搜索结果' })).toBeVisible();
 
