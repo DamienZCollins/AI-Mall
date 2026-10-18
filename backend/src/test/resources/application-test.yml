@@ -9,6 +9,7 @@ mall:
     init-bucket: false
   seckill:
     preheat-on-startup: false
+    stock-reconcile-enabled: false
   embedding:
     base-url: http://localhost:1/v1
     api-key: test

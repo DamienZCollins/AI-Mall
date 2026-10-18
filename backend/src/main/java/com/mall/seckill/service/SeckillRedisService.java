@@ -75,15 +75,20 @@ public class SeckillRedisService {
      * 变成只减不还的静默泄漏
      *
      * <p>并发预热会互相删除对方刚写入的状态，用短锁收敛成一次
+     *
+     * @return 本次调用确实持有锁并完成重建返回 true；
+     *         锁被其它线程持有、只能等待对方结果时返回 false，调用方需重试才能确保重建由自己完成
      */
-    public void preheat(Long activityId) {
+    public boolean preheat(Long activityId) {
         if (!Boolean.TRUE.equals(redisTemplate.opsForValue()
                 .setIfAbsent(preheatLockKey(activityId), "1", PREHEAT_LOCK_TTL))) {
+            // 等待持锁线程落地，让调用方紧接着的重试更容易成功；本次未完成重建
             awaitPreheated(activityId);
-            return;
+            return false;
         }
         try {
             rebuild(activityId);
+            return true;
         } finally {
             redisTemplate.delete(preheatLockKey(activityId));
         }
@@ -123,24 +128,45 @@ public class SeckillRedisService {
 
     /**
      * 等待持锁线程预热完成；超时后由调用方的预扣逻辑决定如何响应
+     *
+     * @return 等待窗口内观察到缓存已就绪返回 true，超时或被中断返回 false
      */
-    private void awaitPreheated(Long activityId) {
+    private boolean awaitPreheated(Long activityId) {
         long deadline = System.currentTimeMillis() + PREHEAT_WAIT_MILLIS;
         while (System.currentTimeMillis() < deadline) {
             if (isPreheated(activityId)) {
-                return;
+                return true;
             }
             try {
                 Thread.sleep(PREHEAT_POLL_MILLIS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return;
+                return false;
             }
         }
+        return false;
     }
 
     public boolean isPreheated(Long activityId) {
         return Boolean.TRUE.equals(redisTemplate.hasKey(stockKey(activityId)));
+    }
+
+    /**
+     * 读取 Redis 中的剩余库存，键不存在或值非法时返回 null
+     *
+     * <p>供库存对账使用，不做任何修改
+     */
+    public Integer readStock(Long activityId) {
+        String value = redisTemplate.opsForValue().get(stockKey(activityId));
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException e) {
+            log.warn("活动 {} 的 Redis 库存值非法：{}", activityId, value);
+            return null;
+        }
     }
 
     /**
