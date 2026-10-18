@@ -94,6 +94,9 @@ public class SeckillActivityService {
         if (request.title() != null) {
             activity.setTitle(request.title());
         }
+        if (request.perUserLimit() != null) {
+            activity.setPerUserLimit(request.perUserLimit());
+        }
         if (request.startTime() != null) {
             activity.setStartTime(request.startTime());
         }

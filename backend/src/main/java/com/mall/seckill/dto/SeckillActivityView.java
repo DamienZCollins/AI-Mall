@@ -34,7 +34,7 @@ public record SeckillActivityView(
         @Schema(description = "剩余库存")
         Integer remainingStock,
 
-        @Schema(description = "每人限购数量")
+        @Schema(description = "每人限购数量，当前实现固定为 1")
         Integer perUserLimit,
 
         @Schema(description = "开始时间")

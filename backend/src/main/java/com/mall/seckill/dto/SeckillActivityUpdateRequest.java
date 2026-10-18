@@ -1,6 +1,8 @@
 package com.mall.seckill.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
@@ -14,6 +16,11 @@ public record SeckillActivityUpdateRequest(
         @Schema(description = "活动标题")
         @Size(max = 128, message = "活动标题长度不能超过 128")
         String title,
+
+        @Schema(description = "每人限购数量，当前实现固定为 1", example = "1")
+        @Min(value = 1, message = "限购数量必须大于 0")
+        @Max(value = 1, message = "当前实现每人限购 1 件")
+        Integer perUserLimit,
 
         @Schema(description = "开始时间")
         LocalDateTime startTime,

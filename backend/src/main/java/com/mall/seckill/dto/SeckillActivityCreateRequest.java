@@ -3,6 +3,7 @@ package com.mall.seckill.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -37,8 +38,9 @@ public record SeckillActivityCreateRequest(
         @Min(value = 1, message = "活动总量必须大于 0")
         Integer totalStock,
 
-        @Schema(description = "每人限购数量", example = "1")
+        @Schema(description = "每人限购数量，当前实现固定为 1", example = "1")
         @Min(value = 1, message = "限购数量必须大于 0")
+        @Max(value = 1, message = "当前实现每人限购 1 件")
         Integer perUserLimit,
 
         @Schema(description = "开始时间", example = "2026-10-03T10:00:00")

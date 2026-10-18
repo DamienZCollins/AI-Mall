@@ -21,6 +21,13 @@ public class SeckillActivity {
 
     /** 活动总量，用于校验库存回补上限 */
     private Integer totalStock;
+
+    /**
+     * 每人限购数量，当前实现固定为 1
+     *
+     * <p>预扣脚本按一人一单去重，uk_user_activity 也是用户与活动维度的唯一索引，
+     * 该字段仅作为业务语义保留，不参与限购数量计算
+     */
     private Integer perUserLimit;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
