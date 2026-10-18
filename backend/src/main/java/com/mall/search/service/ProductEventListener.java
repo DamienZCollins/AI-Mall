@@ -5,12 +5,15 @@ import com.mall.product.mq.ProductChangedEvent;
 import com.mall.product.service.ProductService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * 商品变更后同步索引：事务提交后再执行，避免索引到未提交的数据
+ *
+ * <p>监听方法在 AFTER_COMMIT 阶段派发到索引线程池执行，请求线程不等待 embedding 与 ES 写入。
  */
 @Component
 public class ProductEventListener {
@@ -31,6 +34,7 @@ public class ProductEventListener {
         this.productIndexService = productIndexService;
     }
 
+    @Async("productIndexExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onProductChanged(ProductChangedEvent event) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

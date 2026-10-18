@@ -16,6 +16,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Duration;
 import java.util.Arrays;
 
 /**
@@ -25,15 +26,25 @@ import java.util.Arrays;
 @EnableConfigurationProperties(EmbeddingProperties.class)
 public class ElasticsearchConfig {
 
+    /** 从连接池取连接的等待上限，避免高并发下无限期排队 */
+    private static final int CONNECTION_REQUEST_TIMEOUT_MILLIS = 3000;
+
     @Bean(destroyMethod = "close")
-    public RestClient restClient(@Value("${spring.elasticsearch.uris}") String uris) {
+    public RestClient restClient(@Value("${spring.elasticsearch.uris}") String uris,
+                                 @Value("${spring.elasticsearch.connection-timeout:3s}") Duration connectTimeout,
+                                 @Value("${spring.elasticsearch.socket-timeout:10s}") Duration socketTimeout) {
         String cleaned = uris.replace("http://", "").replace("https://", "");
         HttpHost[] hosts = Arrays.stream(cleaned.split(","))
                 .map(String::trim)
                 .filter(host -> !host.isEmpty())
                 .map(HttpHost::create)
                 .toArray(HttpHost[]::new);
-        return RestClient.builder(hosts).build();
+        return RestClient.builder(hosts)
+                .setRequestConfigCallback(config -> config
+                        .setConnectTimeout(toMillis(connectTimeout))
+                        .setSocketTimeout(toMillis(socketTimeout))
+                        .setConnectionRequestTimeout(CONNECTION_REQUEST_TIMEOUT_MILLIS))
+                .build();
     }
 
     @Bean
@@ -48,5 +59,12 @@ public class ElasticsearchConfig {
     @Bean
     public ElasticsearchClient elasticsearchClient(ElasticsearchTransport transport) {
         return new ElasticsearchClient(transport);
+    }
+
+    /**
+     * Apache HttpClient 的请求配置以毫秒为单位，至少保留 1 毫秒避免出现无超时
+     */
+    private static int toMillis(Duration duration) {
+        return (int) Math.max(duration.toMillis(), 1L);
     }
 }
