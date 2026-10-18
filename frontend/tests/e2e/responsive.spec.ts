@@ -13,7 +13,7 @@ test.describe('响应式与可访问性', () => {
         await page.goto(path);
         await page.waitForLoadState('networkidle');
         const overflow = await page.evaluate(
-          () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
         );
         expect(overflow, `${path} 在 ${width}px 出现横向溢出 ${overflow}px`).toBeLessThanOrEqual(1);
       }
@@ -61,7 +61,7 @@ test.describe('响应式与可访问性', () => {
     const missing = await page.evaluate(() =>
       Array.from(document.querySelectorAll('img'))
         .filter((img) => !img.hasAttribute('alt'))
-        .map((img) => img.src.slice(0, 80))
+        .map((img) => img.src.slice(0, 80)),
     );
     expect(missing).toEqual([]);
   });
@@ -91,13 +91,71 @@ test.describe('响应式与可访问性', () => {
     await page.goto('/');
     const footer = page.getByRole('contentinfo');
     await expect(footer).toBeVisible();
-    const hrefs = await footer.locator('a').evaluateAll((links) =>
-      links.map((link) => link.getAttribute('href') ?? '')
-    );
+    const hrefs = await footer
+      .locator('a')
+      .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''));
     for (const href of hrefs) {
-      // 只允许站内已实现路由、mailto 与 tel
-      if (href.startsWith('mailto:') || href.startsWith('tel:')) continue;
-      expect(href).toMatch(/^\/(products|search|seckill|me|admin)?$|^\/login(\?redirect=.*)?$/);
+      // 只允许站内已实现路由
+      expect(href).toMatch(
+        /^\/(?:#(?:seckill|weekly|popular))?$|^\/(products|search|seckill|me|admin)?$|^\/login(\?redirect=.*)?$/,
+      );
     }
+  });
+
+  test('首页区块顺序为秒杀、本周精选、人气好物', async ({ page }) => {
+    await page.route('**/api/seckill/activities*', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'ok',
+          data: { total: 0, page: 1, size: 3, list: [] },
+        }),
+      }),
+    );
+    await page.goto('/');
+    await expect(page.locator('#seckill')).toBeVisible();
+    const order = await page
+      .locator('main section[id]')
+      .evaluateAll((sections) => sections.map((section) => section.id));
+    expect(order).toEqual(['seckill', 'weekly', 'popular']);
+  });
+
+  test('首页滚动时主导航只高亮当前区块', async ({ page }) => {
+    // 主导航在 1100px 以下由底部导航替代，本用例只验证桌面端的滚动高亮
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.route('**/api/seckill/activities*', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'ok',
+          data: { total: 0, page: 1, size: 3, list: [] },
+        }),
+      }),
+    );
+    await page.goto('/');
+
+    const nav = page.getByRole('navigation', { name: '主导航' });
+    const weekly = nav.getByRole('link', { name: '本周精选' });
+    const popular = nav.getByRole('link', { name: '人气好物' });
+
+    await page.locator('#weekly').scrollIntoViewIfNeeded();
+    await expect(weekly).toHaveAttribute('aria-current', 'location');
+    await expect(popular).not.toHaveAttribute('aria-current', 'location');
+
+    await page.locator('#popular').scrollIntoViewIfNeeded();
+    await expect(popular).toHaveAttribute('aria-current', 'location');
+    await expect(weekly).not.toHaveAttribute('aria-current', 'location');
+  });
+
+  test('首页不重复展示搜索入口，页脚不展示未开放项与备案信息', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#search-entry')).toHaveCount(0);
+    const footer = page.getByRole('contentinfo');
+    await expect(footer.getByText(/暂未开放/)).toHaveCount(0);
+    await expect(footer.getByText(/备案|ICP/i)).toHaveCount(0);
+    await expect(footer.getByRole('heading', { name: '联系方式' })).toHaveCount(0);
+    await expect(footer.getByRole('link', { name: 'AI 混合搜索' })).toHaveCount(0);
   });
 });
