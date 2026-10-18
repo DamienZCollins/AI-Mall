@@ -44,6 +44,11 @@ mall:
   search:
     index-alias: ${ELASTICSEARCH_INDEX_PRODUCT:mall_product}
     index-name: ${ELASTICSEARCH_INDEX_PRODUCT:mall_product}_v1
+  seckill:
+    # 启动时把未结束活动的库存预热到 Redis
+    preheat-on-startup: ${SECKILL_PREHEAT_ON_STARTUP:true}
+    # 已结束活动的 Redis 库存与数据库库存对账，只告警不修复
+    stock-reconcile-enabled: ${SECKILL_STOCK_RECONCILE_ENABLED:true}
   rocketmq:
     endpoints: ${ROCKETMQ_PROXY_ENDPOINT:localhost:8081}
     order-topic: ${ROCKETMQ_SECKILL_ORDER_TOPIC:mall-seckill-order}
