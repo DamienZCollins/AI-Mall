@@ -39,11 +39,14 @@ public record SearchHit(
         Double score,
 
         @Schema(description = "本文档是否带语义向量")
-        Boolean hasVector
+        Boolean hasVector,
+
+        @Schema(description = "本次检索是否降级为纯 BM25 召回")
+        boolean degraded
 ) {
 
-    public static SearchHit from(ProductDoc doc, Double score) {
+    public static SearchHit from(ProductDoc doc, Double score, boolean degraded) {
         return new SearchHit(doc.productId(), doc.name(), doc.brand(), doc.categoryId(), doc.sellingPoint(),
-                doc.price(), doc.stock(), doc.imageUrl(), score, doc.hasVector());
+                doc.price(), doc.stock(), doc.imageUrl(), score, doc.hasVector(), degraded);
     }
 }

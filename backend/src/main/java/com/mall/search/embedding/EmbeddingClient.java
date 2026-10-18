@@ -8,9 +8,13 @@ import com.mall.common.result.ResultCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,12 +27,27 @@ public class EmbeddingClient {
     private static final Logger log = LoggerFactory.getLogger(EmbeddingClient.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    /** 建立连接的超时，与接口处理耗时无关，固定 5 秒 */
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+
     private final EmbeddingProperties properties;
     private final RestClient restClient;
 
     public EmbeddingClient(EmbeddingProperties properties, RestClient.Builder builder) {
         this.properties = properties;
-        this.restClient = builder.build();
+        this.restClient = builder.requestFactory(requestFactory(properties)).build();
+    }
+
+    /**
+     * 请求工厂：连接超时固定 5 秒，读取超时取 mall.embedding.timeout-seconds
+     */
+    private static ClientHttpRequestFactory requestFactory(EmbeddingProperties properties) {
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(CONNECT_TIMEOUT)
+                .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(Duration.ofSeconds(Math.max(properties.getTimeoutSeconds(), 1)));
+        return factory;
     }
 
     public float[] embed(String text) {

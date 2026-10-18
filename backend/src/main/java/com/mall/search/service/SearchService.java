@@ -15,15 +15,21 @@ import com.mall.search.dto.SearchQuery;
 import com.mall.search.entity.ProductDoc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * 混合检索：BM25 关键词召回 + kNN 语义召回，两路结果在应用层做 RRF 融合
+ *
+ * <p>两路召回在专用线程池内并发执行；向量化失败时降级为纯 BM25 召回，ES 检索失败仍返回检索不可用。
  */
 @Service
 public class SearchService {
@@ -42,13 +48,16 @@ public class SearchService {
 
     private final ElasticsearchClient client;
     private final EmbeddingClient embeddingClient;
+    private final ThreadPoolTaskExecutor recallExecutor;
 
     @Value("${mall.search.index-alias}")
     private String indexAlias;
 
-    public SearchService(ElasticsearchClient client, EmbeddingClient embeddingClient) {
+    public SearchService(ElasticsearchClient client, EmbeddingClient embeddingClient,
+                         @Qualifier("searchRecallExecutor") ThreadPoolTaskExecutor recallExecutor) {
         this.client = client;
         this.embeddingClient = embeddingClient;
+        this.recallExecutor = recallExecutor;
     }
 
     public PageResult<SearchHit> search(SearchQuery query) {
@@ -57,17 +66,42 @@ public class SearchService {
         int window = Math.min(Math.max(page * size, 1) * CANDIDATE_MULTIPLIER, MAX_WINDOW);
         String keyword = query.getKeyword().trim();
 
-        float[] queryVector = embeddingClient.embed(keyword);
-        List<RankedDoc> bm25Hits = keywordSearch(keyword, window);
-        List<RankedDoc> knnHits = knnSearch(queryVector, window);
+        // 向量化必须串行完成，kNN 召回依赖它的结果；失败只降级不中断
+        float[] embedding = null;
+        boolean degraded = false;
+        try {
+            embedding = embeddingClient.embed(keyword);
+        } catch (BusinessException e) {
+            if (e.getCode() != ResultCode.EMBEDDING_FAILED.getCode()) {
+                throw e;
+            }
+            degraded = true;
+            log.warn("查询词向量化失败，本次检索降级为纯 BM25 召回：{}", e.getMessage());
+        }
+        if (embedding == null && !degraded) {
+            degraded = true;
+            log.warn("查询词未取得向量，本次检索降级为纯 BM25 召回");
+        }
+        final float[] queryVector = embedding;
 
+        // 两路召回并发执行，共用有界召回线程池
+        CompletableFuture<List<RankedDoc>> bm25Future =
+                CompletableFuture.supplyAsync(() -> keywordSearch(keyword, window), recallExecutor);
+        List<RankedDoc> knnHits = List.of();
+        CompletableFuture<List<RankedDoc>> knnFuture = degraded ? null
+                : CompletableFuture.supplyAsync(() -> knnSearch(queryVector, window), recallExecutor);
+
+        List<RankedDoc> bm25Hits = await(bm25Future, "BM25");
+        if (knnFuture != null) {
+            knnHits = await(knnFuture, "kNN");
+        }
         List<RankedDoc> fused = RrfFuser.fuse(bm25Hits, knnHits, RrfFuser.DEFAULT_RANK_CONSTANT);
         int from = Math.min((page - 1) * size, fused.size());
         int to = Math.min(from + size, fused.size());
 
         List<SearchHit> hits = new ArrayList<>(to - from);
         for (RankedDoc doc : fused.subList(from, to)) {
-            hits.add(SearchHit.from(doc.doc(), doc.score()));
+            hits.add(SearchHit.from(doc.doc(), doc.score(), degraded));
         }
         return PageResult.of(fused.size(), page, size, hits);
     }
@@ -115,6 +149,25 @@ public class SearchService {
             return hits;
         } catch (IOException | RuntimeException e) {
             log.error("{} 召回失败", path, e);
+            throw new BusinessException(ResultCode.SEARCH_UNAVAILABLE);
+        }
+    }
+
+    /**
+     * 等待单路召回：业务异常原样抛出，其余异常统一转成检索不可用
+     */
+    private List<RankedDoc> await(CompletableFuture<List<RankedDoc>> future, String path) {
+        try {
+            return future.join();
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            if (cause instanceof BusinessException businessException) {
+                throw businessException;
+            }
+            log.error("{} 召回失败", path, cause);
             throw new BusinessException(ResultCode.SEARCH_UNAVAILABLE);
         }
     }

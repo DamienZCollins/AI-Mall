@@ -17,6 +17,10 @@ spring:
       timeout: 3s
   elasticsearch:
     uris: http://${ELASTICSEARCH_HOST:localhost}:${ELASTICSEARCH_PORT:9200}
+    # 建连超时，ES 在局域网内，3 秒足够且能快速失败
+    connection-timeout: ${ELASTICSEARCH_CONNECT_TIMEOUT:3s}
+    # 单次请求读取超时，需覆盖检索与批量写入，取值高于检索 P95
+    socket-timeout: ${ELASTICSEARCH_SOCKET_TIMEOUT:10s}
 
 mall:
   jwt:
@@ -35,6 +39,8 @@ mall:
     api-key: ${EMBEDDING_API_KEY}
     model: ${EMBEDDING_MODEL:Qwen/Qwen3-Embedding-0.6B}
     dimensions: ${EMBEDDING_DIMENSIONS:1024}
+    # 单次请求的读取超时，生成长文本向量时接口耗时较长
+    timeout-seconds: ${EMBEDDING_TIMEOUT_SECONDS:30}
   search:
     index-alias: ${ELASTICSEARCH_INDEX_PRODUCT:mall_product}
     index-name: ${ELASTICSEARCH_INDEX_PRODUCT:mall_product}_v1
