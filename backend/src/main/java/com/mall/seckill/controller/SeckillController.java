@@ -80,4 +80,12 @@ public class SeckillController {
     public Result<SeckillOrderView> pay(@PathVariable String orderNo) {
         return Result.success(orderService.pay(orderNo));
     }
+
+    @Operation(summary = "取消秒杀订单，仅限本人的待支付订单",
+            description = "取消后库存回补，但 uk_user_activity 限定每人每活动终身一单，"
+                    + "该用户不能再次抢购同一活动；非本人订单与不存在的订单统一返回 4006")
+    @PostMapping("/orders/{orderNo}/cancel")
+    public Result<SeckillOrderView> cancel(@PathVariable String orderNo) {
+        return Result.success(orderService.cancel(orderNo, AuthContext.currentUserId()));
+    }
 }

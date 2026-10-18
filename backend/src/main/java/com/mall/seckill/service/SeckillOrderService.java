@@ -63,6 +63,47 @@ public class SeckillOrderService {
         return SeckillOrderView.from(requireOrder(orderNo));
     }
 
+    /**
+     * 用户主动取消订单，仅限本人的待支付订单
+     *
+     * <p>取消与超时关单复用同一套状态转移与库存回补，条件更新成功才回补
+     *
+     * <p>订单按订单号与用户 ID 联合查询，「订单不存在」与「不属于本人」落到同一分支，
+     * 不通过返回码差异泄露订单是否存在
+     */
+    @Transactional
+    public SeckillOrderView cancel(String orderNo, Long userId) {
+        if (userId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+        SeckillOrder order = requireOwnedOrder(orderNo, userId);
+        SeckillOrderStatus current = SeckillOrderStatus.fromCode(order.getStatus());
+        if (current == null || !current.canTransitionTo(SeckillOrderStatus.CANCELLED)) {
+            throw new BusinessException(ResultCode.SECKILL_ORDER_STATUS_ILLEGAL.getCode(),
+                    "当前状态为「" + (current == null ? "未知" : current.getDescription()) + "」，不能取消");
+        }
+
+        int affected = orderMapper.transferStatus(orderNo, SeckillOrderStatus.PENDING_PAYMENT.getCode(),
+                SeckillOrderStatus.CANCELLED.getCode(), null);
+        if (affected == 0) {
+            // 并发下已被支付或超时关单抢先流转，普通查询读到的是事务快照，改用加锁读定位实际状态
+            Integer latestStatus = orderMapper.selectStatusForUpdate(orderNo);
+            if (latestStatus == null) {
+                throw new BusinessException(ResultCode.SECKILL_ORDER_NOT_FOUND);
+            }
+            SeckillOrderStatus latest = SeckillOrderStatus.fromCode(latestStatus);
+            throw new BusinessException(ResultCode.SECKILL_ORDER_STATUS_ILLEGAL.getCode(),
+                    "当前状态为「" + (latest == null ? "未知" : latest.getDescription()) + "」，不能取消");
+        }
+
+        restoreStock(order);
+        // 只回补库存不移除 Redis 买家标记：移除后用户能再次通过预扣，而 uk_user_activity 会拦下插入，
+        // 释放的 Redis 库存不会再被回补，形成只减不还的静默泄漏
+        restoreRedisAfterCommit(order);
+        log.info("订单 {} 已取消并回补库存，用户 {} 活动 {}", orderNo, userId, order.getActivityId());
+        return SeckillOrderView.from(requireOrder(orderNo));
+    }
+
     @Transactional
     public SeckillOrderView getOrder(String orderNo) {
         return SeckillOrderView.from(requireOrder(orderNo));
@@ -124,14 +165,6 @@ public class SeckillOrderService {
     }
 
     @Transactional(readOnly = true)
-    public long countByUserAndActivity(Long userId, Long activityId) {
-        Long count = orderMapper.selectCount(Wrappers.<SeckillOrder>lambdaQuery()
-                .eq(SeckillOrder::getUserId, userId)
-                .eq(SeckillOrder::getActivityId, activityId));
-        return count == null ? 0 : count;
-    }
-
-    @Transactional(readOnly = true)
     public SeckillOrderView findByUserAndActivity(Long userId, Long activityId) {
         SeckillOrder order = orderMapper.selectOne(Wrappers.<SeckillOrder>lambdaQuery()
                 .eq(SeckillOrder::getUserId, userId)
@@ -160,7 +193,7 @@ public class SeckillOrderService {
                 continue;
             }
             restoreStock(order);
-            // 延迟消息丢失时靠本任务兜底，Redis 买家标记和库存同样要还原
+            // 延迟消息丢失时靠本任务兜底；库存还回活动，买家标记保留：uk_user_activity 限定终身一单
             restoreRedisAfterCommit(order);
             cancelled++;
         }
@@ -200,6 +233,20 @@ public class SeckillOrderService {
     private SeckillOrder requireOrder(String orderNo) {
         SeckillOrder order = orderNo == null ? null : orderMapper.selectOne(
                 Wrappers.<SeckillOrder>lambdaQuery().eq(SeckillOrder::getOrderNo, orderNo));
+        if (order == null) {
+            throw new BusinessException(ResultCode.SECKILL_ORDER_NOT_FOUND);
+        }
+        return order;
+    }
+
+    /**
+     * 按订单号与用户 ID 联合查询，两种不匹配都返回订单不存在
+     */
+    private SeckillOrder requireOwnedOrder(String orderNo, Long userId) {
+        SeckillOrder order = orderNo == null ? null : orderMapper.selectOne(
+                Wrappers.<SeckillOrder>lambdaQuery()
+                        .eq(SeckillOrder::getOrderNo, orderNo)
+                        .eq(SeckillOrder::getUserId, userId));
         if (order == null) {
             throw new BusinessException(ResultCode.SECKILL_ORDER_NOT_FOUND);
         }

@@ -33,4 +33,10 @@ public interface SeckillOrderMapper extends BaseMapper<SeckillOrder> {
      */
     @Select("SELECT user_id FROM seckill_order WHERE activity_id = #{activityId}")
     List<Long> selectUserIdsByActivityId(@Param("activityId") Long activityId);
+
+    /**
+     * 加锁读取订单状态，拿到其它事务已提交的最新值，用于条件更新落空后定位实际状态
+     */
+    @Select("SELECT status FROM seckill_order WHERE order_no = #{orderNo} FOR UPDATE")
+    Integer selectStatusForUpdate(@Param("orderNo") String orderNo);
 }
