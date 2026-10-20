@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'playwright-report/**', 'test-results/**', '原型.html'],
+    ignores: ['dist/**', 'node_modules/**', '原型.html'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -44,13 +44,6 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'warn',
       eqeqeq: ['error', 'always'],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
-    },
-  },
-  {
-    // 联调证据采集与截图脚本靠 stdout 输出进度，允许 console
-    files: ['tests/e2e/record-*.mjs', 'tests/e2e/capture-shots.mjs'],
-    rules: {
-      'no-console': 'off',
     },
   },
   prettierConfig
