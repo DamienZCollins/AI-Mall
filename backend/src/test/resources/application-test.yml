@@ -20,3 +20,8 @@ spring:
   datasource:
     username: test
     password: test
+  # 单元测试与上下文测试不需要连接 Elasticsearch，指向不可达地址让初始化快速失败
+  elasticsearch:
+    uris: http://localhost:1
+    connection-timeout: 1s
+    socket-timeout: 1s
