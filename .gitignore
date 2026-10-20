@@ -1,7 +1,6 @@
 # 本地文档与代理说明（不进入版本库）
+# 文档统一收敛在根 docs/：backend/ 与 frontend/ 子目录分别存放各端文档
 /docs/
-/backend/docs/
-/frontend/docs/
 /AGENTS.md
 
 # 环境变量
@@ -51,33 +50,15 @@ desktop.ini
 *.tmp
 *.bak
 
-# 本地验证脚本按分类存放
-/backend/scripts/checks/*
-!/backend/scripts/checks/api_check.py
-/backend/scripts/infra/*
-!/backend/scripts/infra/init-rocketmq-topics.sh
-/backend/scripts/loadtest/
-
 # 本地启动脚本（含明文凭据，不入库）
 /backend/.run*.bat
 
 # 本地启动状态
 /backend/.last-start-process
 
-# 前端测试与本地环境
-/frontend/test-results/
-/frontend/playwright-report/
-/frontend/blob-report/
+# 前端本地环境
 /frontend/.env.local
 /frontend/.env.*.local
 
 # 本地商品图素材（应用使用的副本在 frontend/public/images/products）
 /素材/
-
-# 并发验证用测试数据
-/backend/sql/data-seckill-test.sql
-/backend/sql/data-seckill-load.sql
-
-# 压测产物（原始结果与令牌只保留在本地）
-/backend/scripts/jmeter/
-/backend/result/
