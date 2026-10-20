@@ -62,3 +62,24 @@ desktop.ini
 
 # 本地商品图素材（应用使用的副本在 frontend/public/images/products）
 /素材/
+
+# 本地压测资产
+/backend/scripts/loadtest/
+/backend/sql/data-seckill-load.sql
+
+# 归档恢复的本地资产（压测脚本、原始结果、验收文档与旧目录结构，不入库）
+/.env
+/.env.example
+/config/
+/docker/
+/infra/
+/docker-compose.yml
+/scripts/
+/backend/scripts/
+/backend/docs/
+/backend/sql/data-seckill-test.sql
+/backend/sql/cleanup-test-data.sql
+/frontend/docs/
+/frontend/tests/
+/frontend/playwright.config.ts
+/frontend/.gitkeep
