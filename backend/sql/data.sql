@@ -14,8 +14,8 @@ ON DUPLICATE KEY UPDATE `password` = VALUES(`password`),
 DELETE FROM `product`;
 ALTER TABLE `product` AUTO_INCREMENT = 1;
 
--- 商品与素材图一一对应：编号即素材序号（01~34、40），图片由 scripts/demo/upload_product_images.py
--- 以 products/{序号}.jpg 为对象键写入 RustFS，image_url 前缀取 .env 的 RUSTFS_PUBLIC_BASE_URL。
+-- 商品与素材图一一对应：编号即素材序号（01~34、40），图片以 products/{序号}.jpg
+-- 为对象键存放在 RustFS，image_url 前缀取 .env 的 RUSTFS_PUBLIC_BASE_URL。
 INSERT INTO `product` (`id`, `name`, `brand`, `category_id`, `description`, `selling_point`, `price`, `stock`, `status`,
                        `image_url`)
 VALUES
