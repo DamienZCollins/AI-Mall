@@ -95,39 +95,42 @@ Elasticsearch 使用自建镜像 `backend/docker/elasticsearch/Dockerfile`，额
 │   ├── pom.xml
 │   ├── docker/                 # RocketMQ 配置、含 ik 分词的 ES 镜像
 │   ├── docker-compose.yml      # 本地中间件编排
-│   ├── scripts/                # 接口验收与 JMeter 压测脚本
 │   ├── sql/                    # 建表与初始化数据
-│   ├── result/                 # 压测产物
 │   ├── .env.example
 │   └── start.ps1
-├── frontend/                   # 前端开发目录，当前为空
-├── docs/                       # 项目公共文档
+├── frontend/                   # 前端开发入口（Vue 3 + Vite）
+│   ├── src/
+│   ├── public/images/products/ # 商品图（素材副本）
+│   └── package.json
+├── docs/                       # 全部本地文档，不纳入版本库
+│   ├── 接口文档.md
+│   ├── backend/                # 后端总体方案、开发路径、阶段拆分
+│   └── frontend/               # 前端总体方案、开发路径、阶段拆分与页面截图
+├── 素材/                       # 商品图原始素材（40 张）
 ├── README.md
 └── AGENTS.md
 ```
 
 `backend/` 与 `frontend/` 是相互独立的开发入口。后端源码不跨目录引用前端，前端通过 HTTP 接口访问后端。
+文档不再分散在各端目录内，统一以根 `docs/` 为唯一入口，按 `backend/`、`frontend/` 区分归属。
 
-## 验证脚本
+## 仓库边界
 
-`backend/scripts/checks/` 下的脚本用于本机验收，各阶段的实测结果记录在 `docs/拆分任务/` 下：
-
-| 脚本 | 说明 |
-| --- | --- |
-| `backend/scripts/checks/api_check.py` | 认证、权限、商品维护、图片上传 |
-| `backend/scripts/checks/search_check.py` | 对比 RRF 融合、BM25、kNN 三路检索结果 |
-| `backend/scripts/checks/sync_check.py` | 商品变更到 Elasticsearch 索引的同步链路 |
-| `backend/scripts/checks/seckill_check.py` | 秒杀防超卖、防重复下单、状态机、超时回补（含并发） |
-| `backend/scripts/checks/seckill_async_check.py` | Redis 预扣、MQ 异步下单、延迟消息关单、MQ 降级 |
-
-`seckill_check.py` 与 `seckill_async_check.py` 需要并发账号，先执行 `backend/sql/data-seckill-test.sql` 写入测试用户。
+本仓库只保留功能开发与运行所需的代码、建表数据与方案文档，不含任何测试、压测与验收产物，
+也不提供可执行的测试入口。前端仅保留 `dev`、`build`、`preview`、`typecheck`、`lint`、`format` 六个脚本。
 
 ## RocketMQ 主题
 
-首次使用需建主题：
+`start.ps1` 启动时会自动创建两个主题（见脚本「初始化 RocketMQ 主题」一节），正常流程无需手工干预。
+需要单独重建时执行：
 
 ```bash
-sh backend/scripts/infra/init-rocketmq-topics.sh
+docker exec mall-rocketmq-broker sh -c \
+  'cd /home/rocketmq/rocketmq-5.3.2 && sh bin/mqadmin updateTopic -b 127.0.0.1:10911 -t mall-seckill-order -r 4 -w 4 -a "+message.type=NORMAL"'
+
+docker exec mall-rocketmq-broker sh -c \
+  'cd /home/rocketmq/rocketmq-5.3.2 && sh bin/mqadmin updateTopic -b 127.0.0.1:10911 -t mall-seckill-timeout -r 4 -w 4 -a "+message.type=DELAY"'
+
 docker compose restart rocketmq-proxy
 ```
 
@@ -137,4 +140,10 @@ RocketMQ 5.x 的主题要显式声明能接受的消息类型，普通消息与�
 
 ## 文档
 
-本地文档位于 `docs/`，不纳入版本库。
+本地文档位于根 `docs/`，不纳入版本库：
+
+| 路径 | 内容 |
+| --- | --- |
+| `docs/接口文档.md` | 接口、业务码与错误约定 |
+| `docs/backend/` | 后端总体方案、开发路径、阶段 0–6 任务拆分 |
+| `docs/frontend/` | 前端总体方案、开发路径、阶段 0–6 拆分、页面截图与素材接入说明 |
