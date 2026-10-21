@@ -1,7 +1,7 @@
-# 本地文档与代理说明（不进入版本库）
-# 文档统一收敛在根 docs/：backend/ 与 frontend/ 子目录分别存放各端文档
-/docs/
+# 本地代理说明（不进入版本库）
 /AGENTS.md
+
+# 文档统一收敛在根 docs/，随仓库提交
 
 # 环境变量
 /backend/.env
@@ -83,3 +83,6 @@ desktop.ini
 /frontend/tests/
 /frontend/playwright.config.ts
 /frontend/.gitkeep
+
+# 本地工具配置
+/.claude/
