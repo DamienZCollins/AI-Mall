@@ -1,0 +1,355 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Mall 模块化单体架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "docs/diagrams/mall-modules.html",
+    "views": [
+      {
+        "id": "request-entry",
+        "label": "请求入口",
+        "focus": [
+          "web",
+          "app",
+          "user",
+          "product"
+        ],
+        "note": "浏览器请求进入单体应用，按业务模块分发。"
+      },
+      {
+        "id": "seckill-path",
+        "label": "秒杀链路",
+        "focus": [
+          "app",
+          "seckill",
+          "redis",
+          "mq",
+          "mysql"
+        ],
+        "note": "秒杀模块依赖 Redis 预扣与 RocketMQ 异步落库。"
+      },
+      {
+        "id": "search-path",
+        "label": "检索链路",
+        "focus": [
+          "app",
+          "search",
+          "es",
+          "embed",
+          "product"
+        ],
+        "note": "检索模块消费商品变更事件，并回查商品数据。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "前端应用",
+      "sublabel": "Vue 3 + Vite",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "app",
+      "type": "backend",
+      "label": "Spring Boot 单体",
+      "sublabel": "Java 21 · :8080",
+      "pos": [
+        280,
+        240
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "tag": "模块优先"
+    },
+    {
+      "id": "user",
+      "type": "backend",
+      "label": "user",
+      "sublabel": "认证与 JWT",
+      "pos": [
+        540,
+        70
+      ],
+      "size": [
+        130,
+        58
+      ]
+    },
+    {
+      "id": "product",
+      "type": "backend",
+      "label": "product",
+      "sublabel": "商品与图片",
+      "pos": [
+        540,
+        230
+      ],
+      "size": [
+        130,
+        58
+      ]
+    },
+    {
+      "id": "seckill",
+      "type": "backend",
+      "label": "seckill",
+      "sublabel": "预扣与订单",
+      "pos": [
+        540,
+        390
+      ],
+      "size": [
+        130,
+        58
+      ],
+      "tag": "Lua + MQ"
+    },
+    {
+      "id": "search",
+      "type": "backend",
+      "label": "search",
+      "sublabel": "混合检索",
+      "pos": [
+        540,
+        550
+      ],
+      "size": [
+        130,
+        58
+      ],
+      "tag": "RRF k=60"
+    },
+    {
+      "id": "mysql",
+      "type": "database",
+      "label": "MySQL",
+      "sublabel": "业务数据",
+      "pos": [
+        800,
+        160
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis",
+      "sublabel": "库存与买家集合",
+      "pos": [
+        800,
+        320
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "mq",
+      "type": "messagebus",
+      "label": "RocketMQ",
+      "sublabel": "建单 / 延迟关单",
+      "pos": [
+        800,
+        450
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "es",
+      "type": "database",
+      "label": "Elasticsearch 8",
+      "sublabel": "BM25 + dense_vector",
+      "pos": [
+        800,
+        570
+      ],
+      "size": [
+        140,
+        58
+      ]
+    },
+    {
+      "id": "embed",
+      "type": "external",
+      "label": "Embedding 服务",
+      "sublabel": "OpenAI 兼容",
+      "pos": [
+        1060,
+        570
+      ],
+      "size": [
+        150,
+        58
+      ]
+    },
+    {
+      "id": "rustfs",
+      "type": "external",
+      "label": "RustFS",
+      "sublabel": "S3 兼容对象存储",
+      "pos": [
+        1060,
+        160
+      ],
+      "size": [
+        150,
+        58
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "模块化单体（单进程，模块内分层）",
+      "wraps": [
+        "app",
+        "user",
+        "product",
+        "seckill",
+        "search"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "web-app",
+      "from": "web",
+      "to": "app",
+      "label": "HTTP / JSON",
+      "variant": "emphasis"
+    },
+    {
+      "id": "app-user",
+      "from": "app",
+      "to": "user"
+    },
+    {
+      "id": "app-product",
+      "from": "app",
+      "to": "product"
+    },
+    {
+      "id": "app-seckill",
+      "from": "app",
+      "to": "seckill"
+    },
+    {
+      "id": "app-search",
+      "from": "app",
+      "to": "search"
+    },
+    {
+      "id": "product-mysql",
+      "from": "product",
+      "to": "mysql",
+      "label": "MyBatis-Plus"
+    },
+    {
+      "id": "product-rustfs",
+      "from": "product",
+      "to": "rustfs",
+      "label": "图片上传",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "top"
+    },
+    {
+      "id": "seckill-redis",
+      "from": "seckill",
+      "to": "redis",
+      "label": "Lua 原子预扣",
+      "variant": "emphasis"
+    },
+    {
+      "id": "seckill-mq",
+      "from": "seckill",
+      "to": "mq",
+      "label": "投递建单消息",
+      "variant": "emphasis"
+    },
+    {
+      "id": "mq-mysql",
+      "from": "mq",
+      "to": "mysql",
+      "label": "消费端落库",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "right",
+      "via": [
+        [
+          990,
+          479
+        ],
+        [
+          990,
+          189
+        ]
+      ],
+      "labelAt": [
+        995,
+        335
+      ]
+    },
+    {
+      "id": "search-es",
+      "from": "search",
+      "to": "es",
+      "label": "BM25 + kNN",
+      "variant": "emphasis"
+    },
+    {
+      "id": "search-embed",
+      "from": "es",
+      "to": "embed",
+      "label": "查询向量化"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "模块边界",
+      "items": [
+        "每个模块内部按 controller / service / mapper / entity / dto / mq 分层",
+        "entity 不跨模块暴露，跨模块只走 DTO 与 service 方法",
+        "search 与 seckill 依赖 product 的 DTO 和 service，反向无依赖"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "两条主线",
+      "items": [
+        "秒杀：Redis Lua 预扣 → RocketMQ 异步落库 → 延迟消息与定时扫描回补",
+        "检索：BM25 与 kNN 双路召回 → 应用层 RRF 融合 → MySQL 回填业务字段"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "外部依赖",
+      "items": [
+        "Elasticsearch 8 承载索引与向量检索",
+        "Embedding 走 OpenAI 兼容接口，失败降级为纯关键词召回",
+        "RustFS 只承担商品图片，不做通用文件服务"
+      ]
+    }
+  ]
+}

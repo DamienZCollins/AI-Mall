@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "秒杀下单链路",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "docs/diagrams/mall-seckill-sequence.html",
+    "viewBox": [
+      1040,
+      600
+    ],
+    "views": [
+      {
+        "id": "preheat",
+        "label": "库存预热",
+        "focus": [
+          "app",
+          "redis",
+          "mysql"
+        ],
+        "note": "活动开始前把库存与时间窗写入 Redis，预扣只依赖 Redis 单点原子操作。"
+      },
+      {
+        "id": "hot-path",
+        "label": "抢购主链路",
+        "focus": [
+          "user",
+          "app",
+          "redis",
+          "mq"
+        ],
+        "note": "请求路径上只有一次 Lua 脚本与一次消息投递，建单移出同步流程。"
+      },
+      {
+        "id": "async-settle",
+        "label": "异步落库与回补",
+        "focus": [
+          "mq",
+          "consumer",
+          "mysql",
+          "scheduler"
+        ],
+        "note": "消费端落库，延迟消息与定时扫描两条通道负责超时关单与库存回补。"
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "浏览器"
+    },
+    {
+      "id": "app",
+      "type": "backend",
+      "label": "秒杀接口",
+      "sublabel": "Spring Boot"
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis",
+      "sublabel": "库存 + 买家集合"
+    },
+    {
+      "id": "mq",
+      "type": "messagebus",
+      "label": "RocketMQ",
+      "sublabel": "建单 / 延迟关单"
+    },
+    {
+      "id": "consumer",
+      "type": "backend",
+      "label": "订单消费者",
+      "sublabel": "异步落库"
+    },
+    {
+      "id": "mysql",
+      "type": "database",
+      "label": "MySQL",
+      "sublabel": "库存与订单"
+    },
+    {
+      "id": "scheduler",
+      "type": "backend",
+      "label": "定时任务",
+      "sublabel": "超时扫描与对账"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 258,
+      "label": "抢购请求"
+    },
+    {
+      "from": 278,
+      "to": 414,
+      "label": "异步落库"
+    },
+    {
+      "from": 434,
+      "to": 546,
+      "label": "超时关单与回补"
+    }
+  ],
+  "messages": [
+    {
+      "id": "request",
+      "from": "user",
+      "to": "app",
+      "y": 168,
+      "label": "POST /api/seckill/{id}",
+      "variant": "emphasis"
+    },
+    {
+      "id": "deduct",
+      "from": "app",
+      "to": "redis",
+      "y": 196,
+      "label": "EVAL 预扣（时间窗 + 一人一单 + 库存）",
+      "variant": "emphasis"
+    },
+    {
+      "id": "deduct-ok",
+      "from": "redis",
+      "to": "app",
+      "y": 224,
+      "label": "1 成功 / -3 售罄 / -4 重复",
+      "variant": "return"
+    },
+    {
+      "id": "enqueue",
+      "from": "app",
+      "to": "mq",
+      "y": 252,
+      "label": "投递建单消息",
+      "variant": "emphasis"
+    },
+    {
+      "id": "accepted",
+      "from": "app",
+      "to": "user",
+      "y": 280,
+      "label": "返回受理，前端轮询结果",
+      "variant": "return"
+    },
+    {
+      "id": "insert-order",
+      "from": "consumer",
+      "to": "mysql",
+      "y": 308,
+      "label": "插入订单（唯一索引兜重复）",
+      "variant": "emphasis"
+    },
+    {
+      "id": "deduct-db",
+      "from": "consumer",
+      "to": "mysql",
+      "y": 336,
+      "label": "UPDATE stock > 0 再扣一次"
+    },
+    {
+      "id": "delay-msg",
+      "from": "consumer",
+      "to": "mq",
+      "y": 364,
+      "label": "投递延迟关单消息",
+      "variant": "dashed"
+    },
+    {
+      "id": "timeout",
+      "from": "mq",
+      "to": "consumer",
+      "y": 392,
+      "label": "延迟到期"
+    },
+    {
+      "id": "cancel",
+      "from": "consumer",
+      "to": "mysql",
+      "y": 420,
+      "label": "条件更新为超时取消",
+      "variant": "emphasis"
+    },
+    {
+      "id": "restore",
+      "from": "consumer",
+      "to": "redis",
+      "y": 448,
+      "label": "回补库存（保留买家标记）",
+      "variant": "return"
+    },
+    {
+      "id": "scan",
+      "from": "scheduler",
+      "to": "mysql",
+      "y": 476,
+      "label": "扫描过期未支付订单",
+      "variant": "dashed"
+    },
+    {
+      "id": "scan-fix",
+      "from": "scheduler",
+      "to": "redis",
+      "y": 504,
+      "label": "兜底回补",
+      "variant": "dashed"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "app",
+      "from": 163,
+      "to": 270,
+      "type": "backend"
+    },
+    {
+      "participant": "redis",
+      "from": 189,
+      "to": 222,
+      "type": "database"
+    },
+    {
+      "participant": "mq",
+      "from": 241,
+      "to": 377,
+      "type": "messagebus"
+    },
+    {
+      "participant": "consumer",
+      "from": 287,
+      "to": 461,
+      "type": "backend"
+    },
+    {
+      "participant": "mysql",
+      "from": 325,
+      "to": 357,
+      "type": "database"
+    },
+    {
+      "participant": "scheduler",
+      "from": 475,
+      "to": 520,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "请求路径",
+      "items": [
+        "一次 Lua 脚本完成时间窗、一人一单、库存判断与扣减",
+        "失败码直接返回，负数分支不修改任何键",
+        "成功只投递消息，不等建单结果"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "一致性兜底",
+      "items": [
+        "消费端以 stock > 0 条件更新再扣一次数据库库存",
+        "(user_id, activity_id) 唯一索引兜重复消息",
+        "表级 CHECK 约束使负库存无法写入"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "回补闭环",
+      "items": [
+        "延迟消息负责精确关单，定时扫描按分钟兜底",
+        "状态流转用条件更新，重复触发不会重复回补",
+        "回补库存但保留买家标记，一人一单终身有效"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "混合检索数据流",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "docs/diagrams/mall-search-dataflow.html",
+    "views": [
+      {
+        "id": "dual-recall",
+        "label": "双路召回",
+        "focus": [
+          "query",
+          "embedding",
+          "es"
+        ],
+        "note": "同一查询并发走关键词与向量两路，互不阻塞。"
+      },
+      {
+        "id": "fusion",
+        "label": "RRF 融合",
+        "focus": [
+          "es",
+          "fuser",
+          "refill",
+          "mysql"
+        ],
+        "note": "按名次而非原始分融合，再用 MySQL 回填业务字段。"
+      }
+    ],
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "stages": [
+    {
+      "label": "查询"
+    },
+    {
+      "label": "召回"
+    },
+    {
+      "label": "融合"
+    },
+    {
+      "label": "回填"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "query",
+      "type": "frontend",
+      "label": "用户查询",
+      "sublabel": "自然语言 / 关键词",
+      "stage": 0,
+      "row": 1,
+      "tag": "GET /api/search"
+    },
+    {
+      "id": "embedding",
+      "type": "external",
+      "label": "Embedding 服务",
+      "sublabel": "OpenAI 兼容",
+      "stage": 1,
+      "row": 0,
+      "tag": "1024 维"
+    },
+    {
+      "id": "es",
+      "type": "database",
+      "label": "Elasticsearch",
+      "sublabel": "BM25 + dense_vector",
+      "stage": 1,
+      "row": 2,
+      "tag": "status = 1"
+    },
+    {
+      "id": "fuser",
+      "type": "backend",
+      "label": "RRF 融合",
+      "sublabel": "应用层实现",
+      "stage": 2,
+      "row": 1,
+      "tag": "k = 60"
+    },
+    {
+      "id": "refill",
+      "type": "backend",
+      "label": "结果回填",
+      "sublabel": "价格 / 库存 / 图片",
+      "stage": 3,
+      "row": 1
+    },
+    {
+      "id": "mysql",
+      "type": "database",
+      "label": "MySQL",
+      "sublabel": "商品表",
+      "stage": 3,
+      "row": 2
+    }
+  ],
+  "flows": [
+    {
+      "id": "query-bm25",
+      "from": "query",
+      "to": "es",
+      "label": "关键词查询",
+      "classification": "multi_match",
+      "variant": "emphasis"
+    },
+    {
+      "id": "query-embed",
+      "from": "query",
+      "to": "embedding",
+      "label": "查询向量化",
+      "classification": "外部调用"
+    },
+    {
+      "id": "embed-knn",
+      "from": "embedding",
+      "to": "es",
+      "label": "kNN 查询",
+      "classification": "cosine",
+      "variant": "emphasis",
+      "labelAt": [
+        315,
+        204
+      ]
+    },
+    {
+      "id": "es-fuse",
+      "from": "es",
+      "to": "fuser",
+      "label": "两路候选",
+      "classification": "size × 2，上限 200",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fuse-refill",
+      "from": "fuser",
+      "to": "refill",
+      "label": "融合排序",
+      "classification": "按名次"
+    },
+    {
+      "id": "refill-db",
+      "from": "refill",
+      "to": "mysql",
+      "label": "回填业务字段",
+      "classification": "按 ID 批量查询",
+      "labelAt": [
+        745,
+        318
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "召回",
+      "items": [
+        "BM25 与 kNN 并发执行，单路失败仍按原错误码返回",
+        "固定过滤 status = 1，无向量的文档不参与向量检索",
+        "两路各取 size × 2 候选，窗口上限 200"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "融合",
+      "items": [
+        "应用层实现 score = Σ 1 / (k + rank)，k = 60",
+        "按名次融合，BM25 分与余弦相似度不可比",
+        "只在一路出现的商品按单路得分参与排序"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "索引同步",
+      "items": [
+        "商品变更在数据库事务提交后异步同步索引",
+        "向量化失败写入 hasVector=false，关键词仍可召回",
+        "重建索引接口可整体恢复"
+      ]
+    }
+  ]
+}
