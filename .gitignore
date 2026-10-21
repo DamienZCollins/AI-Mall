@@ -86,3 +86,6 @@ desktop.ini
 
 # 本地工具配置
 /.claude/
+
+# Archify 绘图工作目录（候选 JSON 与校验产物）
+/.archify/

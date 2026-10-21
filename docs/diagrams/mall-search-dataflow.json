@@ -6,47 +6,36 @@
     "locale": "zh-CN",
     "quality_profile": "showcase",
     "output": "docs/diagrams/mall-search-dataflow.html",
+    "repository": {
+      "url": "https://github.com/DamienZCollins/AI-Mall.git",
+      "revision": "63a6ccaf196c3e5577aa0fe3d81d1cda93663fe7"
+    },
     "views": [
       {
         "id": "dual-recall",
         "label": "双路召回",
-        "focus": [
-          "query",
-          "embedding",
-          "es"
-        ],
-        "note": "同一查询并发走关键词与向量两路，互不阻塞。"
+        "focus": ["query", "embedding", "es"],
+        "note": "查询向量化必须先完成，之后 BM25 与 kNN 两路在召回线程池内并发执行。"
       },
       {
         "id": "fusion",
         "label": "RRF 融合",
-        "focus": [
-          "es",
-          "fuser",
-          "refill",
-          "mysql"
-        ],
-        "note": "按名次而非原始分融合，再用 MySQL 回填业务字段。"
+        "focus": ["es", "fuser", "hits"],
+        "note": "按名次而非原始分融合，BM25 分与余弦相似度之间不可比。"
+      },
+      {
+        "id": "index-sync",
+        "label": "索引同步",
+        "focus": ["product", "listener", "index", "es"],
+        "note": "商品事务提交后异步同步索引，向量化失败只写业务字段。"
       }
-    ],
-    "viewBox": [
-      1080,
-      560
     ]
   },
   "stages": [
-    {
-      "label": "查询"
-    },
-    {
-      "label": "召回"
-    },
-    {
-      "label": "融合"
-    },
-    {
-      "label": "回填"
-    }
+    { "label": "查询" },
+    { "label": "召回" },
+    { "label": "融合" },
+    { "label": "返回" }
   ],
   "nodes": [
     {
@@ -56,7 +45,8 @@
       "sublabel": "自然语言 / 关键词",
       "stage": 0,
       "row": 1,
-      "tag": "GET /api/search"
+      "tag": "GET /api/search",
+      "sources": [{ "path": "backend/src/main/java/com/mall/search/controller/SearchController.java", "line": 32, "end_line": 34 }]
     },
     {
       "id": "embedding",
@@ -65,7 +55,8 @@
       "sublabel": "OpenAI 兼容",
       "stage": 1,
       "row": 0,
-      "tag": "1024 维"
+      "tag": "1024 维",
+      "sources": [{ "path": "backend/src/main/java/com/mall/search/service/SearchService.java", "line": 69, "end_line": 84 }]
     },
     {
       "id": "es",
@@ -74,7 +65,8 @@
       "sublabel": "BM25 + dense_vector",
       "stage": 1,
       "row": 2,
-      "tag": "status = 1"
+      "tag": "status = 1",
+      "sources": [{ "path": "backend/src/main/java/com/mall/search/service/SearchService.java", "line": 112, "end_line": 137 }]
     },
     {
       "id": "fuser",
@@ -83,52 +75,73 @@
       "sublabel": "应用层实现",
       "stage": 2,
       "row": 1,
-      "tag": "k = 60"
+      "tag": "k = 60",
+      "sources": [{ "path": "backend/src/main/java/com/mall/search/service/RrfFuser.java", "line": 28, "end_line": 42 }]
     },
     {
-      "id": "refill",
+      "id": "hits",
       "type": "backend",
-      "label": "结果回填",
-      "sublabel": "价格 / 库存 / 图片",
+      "label": "结果分页",
+      "sublabel": "按 ES 文档组装",
       "stage": 3,
-      "row": 1
+      "row": 1,
+      "sources": [{ "path": "backend/src/main/java/com/mall/search/service/SearchService.java", "line": 98, "end_line": 106 }]
     },
     {
-      "id": "mysql",
-      "type": "database",
-      "label": "MySQL",
-      "sublabel": "商品表",
+      "id": "product",
+      "type": "backend",
+      "label": "商品写接口",
+      "sublabel": "事务提交",
+      "stage": 0,
+      "row": 3,
+      "tag": "ProductChangedEvent",
+      "sources": [{ "path": "backend/src/main/java/com/mall/product/service/ProductService.java", "line": 164, "end_line": 166 }]
+    },
+    {
+      "id": "listener",
+      "type": "backend",
+      "label": "索引监听器",
+      "sublabel": "@Async + AFTER_COMMIT",
+      "stage": 2,
+      "row": 3,
+      "tag": "重试 3 次",
+      "sources": [{ "path": "backend/src/main/java/com/mall/search/service/ProductEventListener.java", "line": 37, "end_line": 44 }]
+    },
+    {
+      "id": "index",
+      "type": "backend",
+      "label": "索引写入",
+      "sublabel": "向量化 + 单条写入",
       "stage": 3,
-      "row": 2
+      "row": 3,
+      "tag": "hasVector",
+      "sources": [{ "path": "backend/src/main/java/com/mall/search/service/ProductIndexService.java", "line": 65, "end_line": 85 }]
     }
   ],
   "flows": [
-    {
-      "id": "query-bm25",
-      "from": "query",
-      "to": "es",
-      "label": "关键词查询",
-      "classification": "multi_match",
-      "variant": "emphasis"
-    },
     {
       "id": "query-embed",
       "from": "query",
       "to": "embedding",
       "label": "查询向量化",
-      "classification": "外部调用"
+      "classification": "串行前置",
+      "variant": "emphasis"
+    },
+    {
+      "id": "query-bm25",
+      "from": "query",
+      "to": "es",
+      "label": "关键词召回",
+      "classification": "multi_match",
+      "variant": "emphasis"
     },
     {
       "id": "embed-knn",
       "from": "embedding",
       "to": "es",
-      "label": "kNN 查询",
+      "label": "kNN 召回",
       "classification": "cosine",
-      "variant": "emphasis",
-      "labelAt": [
-        315,
-        204
-      ]
+      "variant": "emphasis"
     },
     {
       "id": "es-fuse",
@@ -139,22 +152,35 @@
       "variant": "emphasis"
     },
     {
-      "id": "fuse-refill",
+      "id": "fuse-hits",
       "from": "fuser",
-      "to": "refill",
+      "to": "hits",
       "label": "融合排序",
       "classification": "按名次"
     },
     {
-      "id": "refill-db",
-      "from": "refill",
-      "to": "mysql",
-      "label": "回填业务字段",
-      "classification": "按 ID 批量查询",
-      "labelAt": [
-        745,
-        318
-      ]
+      "id": "product-event",
+      "from": "product",
+      "to": "listener",
+      "label": "商品变更事件",
+      "classification": "事务提交后",
+      "variant": "dashed"
+    },
+    {
+      "id": "listener-index",
+      "from": "listener",
+      "to": "index",
+      "label": "同步索引",
+      "classification": "失败重试",
+      "variant": "dashed"
+    },
+    {
+      "id": "index-es",
+      "from": "index",
+      "to": "es",
+      "label": "写入文档",
+      "classification": "refresh=wait_for",
+      "variant": "dashed"
     }
   ],
   "cards": [
@@ -162,8 +188,8 @@
       "dot": "emerald",
       "title": "召回",
       "items": [
-        "BM25 与 kNN 并发执行，单路失败仍按原错误码返回",
-        "固定过滤 status = 1，无向量的文档不参与向量检索",
+        "向量化必须先完成，之后 BM25 与 kNN 在专用线程池内并发执行",
+        "固定过滤 status = 1，kNN 额外要求 hasVector = true",
         "两路各取 size × 2 候选，窗口上限 200"
       ]
     },
@@ -180,9 +206,9 @@
       "dot": "amber",
       "title": "索引同步",
       "items": [
-        "商品变更在数据库事务提交后异步同步索引",
-        "向量化失败写入 hasVector=false，关键词仍可召回",
-        "重建索引接口可整体恢复"
+        "商品变更在数据库事务提交后异步同步索引，请求线程不等待",
+        "向量化失败写入 hasVector=false，该商品仍可被 BM25 召回",
+        "同步失败重试 3 次，全量重建接口可整体恢复"
       ]
     }
   ]
